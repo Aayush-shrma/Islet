@@ -1132,6 +1132,16 @@ namespace Islet
                 var next = await media.GetTrackAsync();
                 bool hadTrack = track != null;
                 bool hadTitle = hadTrack && track!.Title != MediaController.UnknownTitle;
+                // A report from before the last seek would put the bar, and the lyrics, back
+                // where they were
+                if (next != null && seekedAt != default)
+                {
+                    if (track == null || next.Title != track.Title || next.PositionUpdated > seekedAt)
+                        seekedAt = default;
+                    else
+                        next = next with { Position = seekedTo, PositionUpdated = seekedAt };
+                }
+
                 track = next;
 
                 if (next == null)
@@ -1365,23 +1375,35 @@ namespace Islet
             await SeekToAsync(track.Duration * seekFraction);
         }
 
+        // Where a seek from the island went, and when: kept until the player reports a position
+        // from after it, since some (browsers especially) take a while, or never say
+        DateTimeOffset seekedAt;
+        TimeSpan seekedTo;
+
         async Task SeekToAsync(TimeSpan target)
         {
             if (track == null)
                 return;
 
             // Move the bar right away; the player confirms a moment later
-            track = track with { Position = target, PositionUpdated = DateTimeOffset.Now };
+            seekedAt = DateTimeOffset.Now;
+            seekedTo = target;
+            track = track with { Position = target, PositionUpdated = seekedAt };
             ResetLyric();
             EnsureRendering();
 
             try
             {
                 if (!await media.SeekAsync(target))
+                {
+                    // It didn't move, so its own position is the right one after all
+                    seekedAt = default;
                     Log.Info("Player refused to seek");
+                }
             }
             catch (Exception ex)
             {
+                seekedAt = default;
                 Log.Error("Seek failed", ex);
             }
         }

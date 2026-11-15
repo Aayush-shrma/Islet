@@ -106,7 +106,7 @@ namespace Islet
             UpdateCoverBackdrop();
             ExpandedMusic.Height = (style switch
             {
-                LyricsStyle.Line => 204,
+                LyricsStyle.Line => 220,
                 LyricsStyle.Stage => 266,
                 _ => 172
             }) + (MusicTimerCard.Visibility == Visibility.Visible ? TimerCard.SectionHeight : 0);
