@@ -32,6 +32,13 @@ namespace Islet
         High
     }
 
+    /// <summary>Which edge of the screen the island sits on.</summary>
+    public enum IslandEdge
+    {
+        Top,
+        Bottom
+    }
+
     public enum MusicLook
     {
         Pill,
@@ -89,6 +96,9 @@ namespace Islet
         public IslandSize Size { get; set; } = IslandSize.Default;
         // Where along the top it sits, as a share of the screen's width (0.5 is the middle)
         public double IslandX { get; set; } = 0.5;
+
+        /// <summary>The top of the screen, or the bottom, just above the taskbar, growing upwards.</summary>
+        public IslandEdge IslandEdge { get; set; } = IslandEdge.Top;
         public MusicLook MusicLook { get; set; } = MusicLook.Pill;
         public PerformanceMode Performance { get; set; } = PerformanceMode.Medium;
         public bool ShowLyrics { get; set; } = true;
@@ -120,6 +130,16 @@ namespace Islet
 
         /// <summary>YouTube music videos, lyric videos and audio uploads shown and counted as the songs they are.</summary>
         public bool MusicVideosAsSongs { get; set; } = true;
+
+        /// <summary>
+        /// Covers and song checks looked up online (Deezer, iTunes): covers for music videos and
+        /// for songs sent without one, music videos confirmed as songs, the stats' missing covers.
+        /// Off, nothing of these leaves the PC.
+        /// </summary>
+        public bool LookUpOnline { get; set; } = true;
+
+        /// <summary>The version last opened, to say what's new once after an update.</summary>
+        public string? LastSeenVersion { get; set; }
 
         /// <summary>Look up covers the listening stats are missing, on Apple's iTunes catalog.</summary>
         public bool FindStatsCovers { get; set; } = true;

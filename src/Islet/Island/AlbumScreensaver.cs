@@ -84,9 +84,9 @@ namespace Islet
 
         void Build()
         {
-            // Grows down from the top of the screen, where the island is
+            // Grows out of the edge of the screen the island sits on
             stage.Opacity = 0;
-            stage.RenderTransformOrigin = new Point(0.5, 0);
+            stage.RenderTransformOrigin = new Point(0.5, AppSettings.Current.IslandEdge == IslandEdge.Bottom ? 1 : 0);
             stage.RenderTransform = grow;
             stage.Background = Brushes.Black;
 

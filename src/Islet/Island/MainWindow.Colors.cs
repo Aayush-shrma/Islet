@@ -356,7 +356,7 @@ namespace Islet
             }
 
             double band = islandShown ? Math.Min(height.Value, 38) * scale : 30;
-            double top = IslandContainer.Margin.Top + (band - ColorPill.Height) / 2;
+            double top = BandTop(band) + (band - ColorPill.Height) / 2;
 
             ColorPill.Margin = new Thickness(left, top, 0, 0);
         }

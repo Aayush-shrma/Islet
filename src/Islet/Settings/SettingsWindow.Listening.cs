@@ -204,7 +204,7 @@ namespace Islet
         // gave none, looked up a few at a time; the page is drawn again as they arrive
         async Task FillCoversAsync()
         {
-            if (fillingCovers || !Settings.FindStatsCovers)
+            if (fillingCovers || !Settings.FindStatsCovers || !Settings.LookUpOnline)
                 return;
 
             fillingCovers = true;
@@ -212,7 +212,7 @@ namespace Islet
 
             try
             {
-                while (IsLoaded && Settings.FindStatsCovers)
+                while (IsLoaded && Settings.FindStatsCovers && Settings.LookUpOnline)
                 {
                     // What's on screen first, then everything else kept
                     var missing = stats.MissingCovers(First, Last).Take(8).ToList();
@@ -1126,9 +1126,25 @@ namespace Islet
             detail.IsOpen = true;
         }
 
-        // A search in the Spotify app, or on the web without it
-        static void OpenInSpotify(Ranked item)
+        // The song, album or artist itself when Spotify is connected; else a search in the app, or on
+        // the web without it
+        async Task OpenInSpotify(Ranked item)
         {
+            string kind = item.Kind switch { RankedKind.Artist => "artist", RankedKind.Album => "album", _ => "track" };
+
+            if (await spotifyWeb.FindAsync(kind, item.Name, item.Kind == RankedKind.Artist ? null : item.Artist) is string uri)
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    Log.Info("Opening Spotify failed: " + ex.Message);
+                }
+            }
+
             string query = item.Artist != null && item.Kind != RankedKind.Artist ? $"{item.Name} {item.Artist}" : item.Name;
 
             try

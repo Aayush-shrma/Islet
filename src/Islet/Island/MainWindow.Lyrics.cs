@@ -30,7 +30,7 @@ namespace Islet
 
             if (lyricsCache.TryGetValue(key, out var cached))
             {
-                lyrics = cached;
+                SetLyrics(cached);
                 ResetLyric();
                 ApplyLyricsLayout();
                 return;
@@ -92,9 +92,50 @@ namespace Islet
             if (key != trackKey)
                 return;
 
-            lyrics = result;
+            SetLyrics(result);
             ResetLyric();
             ApplyLyricsLayout();
+        }
+
+        // The lyrics as found, before any nudge of their timing
+        IReadOnlyList<LyricsService.Line>? lyricsFound;
+
+        void SetLyrics(IReadOnlyList<LyricsService.Line>? lines)
+        {
+            lyricsFound = lines;
+            double nudge = track == null ? 0 : LyricOffsets.For(track.Artist, track.Title);
+
+            lyrics = lines == null || nudge == 0
+                ? lines
+                : lines.Select(l => l with { Time = l.Time + TimeSpan.FromSeconds(nudge) }).ToList();
+        }
+
+        /// <summary>Moves this song's lyrics later (positive) or earlier, half a second at a time, remembered.</summary>
+        void NudgeLyrics(double seconds)
+        {
+            if (track == null || lyricsFound == null)
+                return;
+
+            double now = seconds == 0 ? 0 : LyricOffsets.For(track.Artist, track.Title) + seconds;
+            LyricOffsets.Set(track.Artist, track.Title, now);
+            SetLyrics(lyricsFound);
+            ResetLyric();
+            EnsureRendering();
+        }
+
+        void LyricsEarlier_Click(object sender, RoutedEventArgs e) => NudgeLyrics(-0.5);
+        void LyricsLater_Click(object sender, RoutedEventArgs e) => NudgeLyrics(0.5);
+        void LyricsReset_Click(object sender, RoutedEventArgs e) => NudgeLyrics(0);
+
+        // The timing items show only with lyrics, and say where the timing is
+        void IslandMenu_Opened(object sender, RoutedEventArgs e)
+        {
+            bool has = lyricsFound != null && track != null;
+            double nudge = has ? LyricOffsets.For(track!.Artist, track.Title) : 0;
+
+            LyricsTimingMenu.Visibility = has ? Visibility.Visible : Visibility.Collapsed;
+            LyricsTimingMenu.Header = nudge == 0 ? "Lyrics timing" : $"Lyrics timing ({nudge:+0.0;-0.0} s)";
+            LyricsReset.IsEnabled = nudge != 0;
         }
 
         void ApplyLyricsLayout()

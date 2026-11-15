@@ -104,7 +104,8 @@ namespace Islet
 
             HeartSlot.Visibility = showHeart ? Visibility.Visible : Visibility.Collapsed;
             SourceLabel.Visibility = track != null && !showHeart ? Visibility.Visible : Visibility.Collapsed;
-            SourceText.Text = track?.SourceName ?? "";
+            // The site for browser music ("YouTube Music"), else the player
+            SourceText.Text = track?.Site ?? track?.SourceName ?? "";
 
             // Globe for browsers, music note for apps
             SourceGlyph.Text = ((char)(track?.Source == MediaSource.Browser ? 0xE774 : 0xE8D6)).ToString();

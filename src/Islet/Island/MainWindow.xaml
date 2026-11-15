@@ -179,13 +179,24 @@
             </Grid.RenderTransform>
 
             <Grid.ContextMenu>
-                <ContextMenu>
+                <ContextMenu Opened="IslandMenu_Opened">
+                    <MenuItem x:Name="LyricsTimingMenu" Header="Lyrics timing">
+                        <MenuItem Header="Earlier (half a second)" Click="LyricsEarlier_Click"/>
+                        <MenuItem Header="Later (half a second)" Click="LyricsLater_Click"/>
+                        <MenuItem x:Name="LyricsReset" Header="As found" Click="LyricsReset_Click"/>
+                    </MenuItem>
                     <MenuItem Header="Pick a colour…" Click="PickColor_Click"/>
                     <MenuItem Header="Settings…" Click="Settings_Click"/>
                     <Separator/>
                     <MenuItem Header="Quit Islet" Click="Quit_Click"/>
                 </ContextMenu>
             </Grid.ContextMenu>
+
+            <!-- The Line look is only 10px tall: this, all but invisible, catches the pointer around it -->
+            <Border x:Name="HoverPad"
+                    Background="#01000000"
+                    Margin="-10,-10,-10,-16"
+                    Visibility="Collapsed"/>
 
             <Border x:Name="IslandShape"
                     Background="Black"

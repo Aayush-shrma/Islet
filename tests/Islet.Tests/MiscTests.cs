@@ -227,3 +227,30 @@ public class NotificationClassifyTests
         Assert.Equal(ChatApp.Other, NotificationWatcher.Classify("Microsoft Teams", new List<string> { "Meeting in 5 minutes" }).App);
     }
 }
+
+public class LyricOffsetsTests
+{
+    [Fact]
+    public void A_songs_lyric_timing_is_remembered_by_artist_and_title()
+    {
+        LyricOffsets.Set("Daft Punk", "Instant Crush", 1.5);
+
+        // The same song from another player, written a little differently, finds the same timing
+        Assert.Equal(1.5, LyricOffsets.For("DAFT PUNK", "Instant Crush"));
+        Assert.Equal(0, LyricOffsets.For("Daft Punk", "Get Lucky"));
+
+        LyricOffsets.Set("Daft Punk", "Instant Crush", 0);
+        Assert.Equal(0, LyricOffsets.For("Daft Punk", "Instant Crush"));
+    }
+}
+
+public class IslandEdgeTests
+{
+    [Theory]
+    [InlineData(100, IslandEdge.Top)]
+    [InlineData(539, IslandEdge.Top)]
+    [InlineData(541, IslandEdge.Bottom)]
+    [InlineData(1050, IslandEdge.Bottom)]
+    public void A_dropped_island_goes_to_the_nearer_edge(double y, IslandEdge edge) =>
+        Assert.Equal(edge, MainWindow.EdgeFor(y, 1080));
+}

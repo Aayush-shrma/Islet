@@ -117,6 +117,10 @@ namespace Islet
             if (minutes <= 0 || screensaver != null || track == null || !playing)
                 return;
 
+            // Sitting still on a call isn't being away
+            if (privacy.Current.Any)
+                return;
+
             if (AlbumScreensaver.IdleFor() < TimeSpan.FromMinutes(minutes))
                 return;
 

@@ -655,7 +655,7 @@ namespace Islet
                 left = visualRight + gap + (privacyShown && !privacyLeft ? privacyWidth : 0);
 
             double band = islandShown ? Math.Min(height.Value, 38) * scale : 30;
-            double top = IslandContainer.Margin.Top + (band - size) / 2;
+            double top = BandTop(band) + (band - size) / 2;
 
             ShelfPill.Margin = new Thickness(left, top, 0, 0);
         }

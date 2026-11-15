@@ -68,8 +68,49 @@ namespace Islet
             }
             catch (Exception ex)
             {
-                Log.Error("Update check failed", ex);
+                if (ex is HttpRequestException or TaskCanceledException)
+                    Log.Info("Update check didn't get an answer: " + ex.Message);
+                else
+                    Log.Error("Update check failed", ex);
                 return null;
+            }
+        }
+
+        /// <summary>
+        /// What changed in <paramref name="version"/>: its release's own notes, or else the titles
+        /// of the commits since <paramref name="since"/>. Empty when neither can be had.
+        /// </summary>
+        public static async Task<IReadOnlyList<string>> NotesForAsync(Version? since, Version version)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(await http.GetStringAsync(
+                    $"https://api.github.com/repos/{Repo}/releases/tags/v{version}"));
+
+                var notes = NotesFromMarkdown(doc.RootElement.TryGetProperty("body", out var body) ? body.GetString() : null);
+
+                if (notes.Count > 0)
+                    return notes;
+            }
+            catch (Exception ex)
+            {
+                Log.Info($"No release notes for {version}: {ex.Message}");
+            }
+
+            if (since == null)
+                return Array.Empty<string>();
+
+            try
+            {
+                using var doc = JsonDocument.Parse(await http.GetStringAsync(
+                    $"https://api.github.com/repos/{Repo}/compare/v{since}...v{version}"));
+
+                return NotesFromCommits(doc.RootElement);
+            }
+            catch (Exception ex)
+            {
+                Log.Info($"No commit notes for {version}: {ex.Message}");
+                return Array.Empty<string>();
             }
         }
 

@@ -54,9 +54,153 @@ namespace Islet
         static bool DragFlair => Profile.Glow;
 
         static double ScreenWidth => SystemParameters.PrimaryScreenWidth;
+        static double ScreenHeight => SystemParameters.PrimaryScreenHeight;
+
+        // The window's top on screen: 0 at the top edge, just above the taskbar at the bottom.
+        // While carried it follows the pointer up and down too.
+        readonly Spring dockY = new(0, 0.5, 0.8);
+
+        // Whether the island is laid out from the bottom of its window, growing upwards
+        bool atBottom;
+
+        // How far below the window's top the pointer was when it picked the island up
+        double grabY;
+
+        // The window's top when the island sits on an edge
+        double WindowTopFor(IslandEdge edge) =>
+            edge == IslandEdge.Bottom ? Math.Max(0, BottomEdge() - Height) : 0;
+
+        // Checks where the taskbar is, a few times a second, while the island sits at the bottom
+        readonly DispatcherTimer taskbarTimer = new() { Interval = TimeSpan.FromMilliseconds(120) };
+        double lastBottomEdge = double.NaN;
+
+        // An auto-hidden taskbar slid up by the pointer, until the pointer leaves it
+        bool taskbarRevealed;
+
+        /// <summary>
+        /// Where the bottom of the usable screen is right now. A taskbar always showing is already
+        /// left out of the work area. One set to hide itself keeps its place on screen even while
+        /// hidden (Windows 11 only slides what's in it away), so it's taken to be showing once the
+        /// pointer touches the bottom edge, and until the pointer moves off it: the island rises
+        /// above it, and settles back after. The island sits clear of that edge itself, so
+        /// hovering over the island doesn't set it off.
+        /// </summary>
+        double BottomEdge()
+        {
+            double bottom = SystemParameters.WorkArea.Bottom;
+            var taskbar = FindWindow("Shell_TrayWnd", null);
+
+            if (taskbar == IntPtr.Zero || !GetWindowRect(taskbar, out var r) || PresentationSource.FromVisual(this) is not { CompositionTarget: { } target })
+                return bottom;
+
+            var top = target.TransformFromDevice.Transform(new Point(r.Left, r.Top));
+            var bottomRight = target.TransformFromDevice.Transform(new Point(r.Right, r.Bottom));
+
+            // Along the bottom: wider than it is tall, and in the lower half of the screen
+            bool alongBottom = bottomRight.X - top.X > (bottomRight.Y - top.Y) * 2 && top.Y > ScreenHeight / 2;
+
+            if (!alongBottom || !TaskbarAutoHides())
+            {
+                taskbarRevealed = false;
+                return bottom;
+            }
+
+            double pointerY = PointerPosition().Y;
+            taskbarRevealed = pointerY >= ScreenHeight - 2 || (taskbarRevealed && pointerY >= top.Y);
+
+            return taskbarRevealed ? Math.Min(ScreenHeight, top.Y) : ScreenHeight;
+        }
+
+        static bool TaskbarAutoHides()
+        {
+            var data = new AppBarData { Size = (uint)Marshal.SizeOf<AppBarData>() };
+            return (SHAppBarMessage(4 /* ABM_GETSTATE */, ref data).ToInt64() & 1 /* ABS_AUTOHIDE */) != 0;
+        }
+
+        void FollowTaskbar()
+        {
+            if (Settings.IslandEdge != IslandEdge.Bottom)
+            {
+                taskbarTimer.Stop();
+                lastBottomEdge = double.NaN;
+                return;
+            }
+
+            if (!taskbarTimer.IsEnabled)
+                taskbarTimer.Start();
+        }
+
+        // The island's top, in the window
+        double IslandTopInWindow(double h) =>
+            atBottom ? Height - IslandContainer.Margin.Bottom - h : IslandContainer.Margin.Top;
+
+        /// <summary>Where a band of the island's small row starts, in the window, to line things up beside it.</summary>
+        double BandTop(double band) =>
+            atBottom ? Height - IslandContainer.Margin.Bottom - band : IslandContainer.Margin.Top;
+
+        /// <summary>The nearer edge for a point on screen: the top half or the bottom half.</summary>
+        internal static IslandEdge EdgeFor(double y, double screenHeight) =>
+            y > screenHeight / 2 ? IslandEdge.Bottom : IslandEdge.Top;
+
+        /// <summary>
+        /// Lays the island out from the bottom of its window (growing upwards), or the top, keeping
+        /// it where it is on screen meanwhile, so the switch itself can't be seen.
+        /// </summary>
+        void LayOutFrom(bool bottom)
+        {
+            if (bottom == atBottom)
+                return;
+
+            double h = Math.Max(1, height.Value);
+            double screenTop = Top + IslandTopInWindow(h);
+
+            atBottom = bottom;
+            IslandContainer.VerticalAlignment = bottom ? VerticalAlignment.Bottom : VerticalAlignment.Top;
+
+            // Each view sits against the screen's edge, so it opens away from it
+            foreach (UIElement child in IslandContent.Children)
+            {
+                if (child is FrameworkElement view && view.VerticalAlignment != VerticalAlignment.Stretch)
+                {
+                    view.VerticalAlignment = bottom ? VerticalAlignment.Bottom : VerticalAlignment.Top;
+
+                    if (view.RenderTransformOrigin.Y is 0 or 1)
+                        view.RenderTransformOrigin = new Point(view.RenderTransformOrigin.X, bottom ? 1 : 0);
+                }
+            }
+
+            IslandContainer.Margin = bottom
+                ? new Thickness(IslandContainer.Margin.Left, 0, 0, IslandTop)
+                : new Thickness(IslandContainer.Margin.Left, IslandTop, 0, 0);
+
+            // The window moves by however far the island moved inside it, and so does where
+            // a carried island is held from
+            double moved = (Top + IslandTopInWindow(h)) - screenTop;
+            dockY.Snap(dockY.Value - moved);
+            dockY.Target = dockY.Value;
+            grabY += moved;
+            Top = dockY.Value;
+        }
 
         void SetUpDock()
         {
+            // A taskbar sliding up, or back down, moves the island with it
+            taskbarTimer.Tick += (s, e) =>
+            {
+                if (dragging)
+                    return;
+
+                double edge = BottomEdge();
+
+                if (double.IsNaN(lastBottomEdge) || Math.Abs(edge - lastBottomEdge) > 1)
+                {
+                    lastBottomEdge = edge;
+                    dockY.Configure(0.32, 0.86);
+                    dockY.Target = WindowTopFor(IslandEdge.Bottom);
+                    EnsureRendering();
+                }
+            };
+
             holdTimer.Tick += (s, e) =>
             {
                 holdTimer.Stop();
@@ -107,15 +251,24 @@ namespace Islet
                 return;
 
             double x = Math.Clamp(Settings.IslandX, 0, 1) * ScreenWidth;
+            var edge = Settings.IslandEdge;
+
+            LayOutFrom(edge == IslandEdge.Bottom);
+            FollowTaskbar();
 
             if (snap)
             {
                 dockX.Snap(x);
+                dockY.Snap(WindowTopFor(edge));
             }
             else
             {
                 dockX.Configure(0.55, 0.78);
                 dockX.Target = x;
+
+                // Across the screen to the other edge, with a little overshoot as it arrives
+                dockY.Configure(0.5, 0.72);
+                dockY.Target = WindowTopFor(edge);
             }
 
             EnsureRendering();
@@ -134,15 +287,21 @@ namespace Islet
             if (Math.Abs(Left - windowLeft) > 0.01)
                 Left = windowLeft;
 
+            if (Math.Abs(Top - dockY.Value) > 0.01)
+                Top = dockY.Value;
+
             islandLeft = left - windowLeft;
             islandOrigin = Math.Clamp((x - left) / w, 0, 1);
 
-            var margin = new Thickness(islandLeft, IslandTop + dragLift.Value, 0, 0);
+            // Lifted away from whichever edge it sits on
+            var margin = atBottom
+                ? new Thickness(islandLeft, 0, 0, IslandTop + dragLift.Value)
+                : new Thickness(islandLeft, IslandTop + dragLift.Value, 0, 0);
 
             if (IslandContainer.Margin != margin)
                 IslandContainer.Margin = margin;
 
-            IslandContainer.RenderTransformOrigin = new Point(islandOrigin, 0);
+            IslandContainer.RenderTransformOrigin = new Point(islandOrigin, atBottom ? 1 : 0);
 
             // Faster means longer and thinner, and the bottom trails behind the top
             double speed = dragging ? dragVelocity : dockX.Velocity;
@@ -192,9 +351,14 @@ namespace Islet
 
             dockX.Target = centred ? ScreenWidth / 2 : x;
 
-            // It stays on the top edge, but stretches a little toward a pointer pulling it down
-            double pull = pointer.Y - IslandTop - Math.Min(height.Value, 38) / 2;
-            dragLift.Target = pull > 0 ? 26 * Math.Tanh(pull / 110) : 0;
+            // Up and down it follows the pointer, laid out from whichever edge is nearer, so it
+            // can be carried all the way to either; kept wholly on screen
+            LayOutFrom(EdgeFor(pointer.Y, ScreenHeight) == IslandEdge.Bottom);
+
+            double h = Math.Max(1, height.Value);
+            double inWindow = IslandTopInWindow(h);
+            dockY.Target = Math.Clamp(pointer.Y - grabY, -inWindow, Math.Max(-inWindow, ScreenHeight - inWindow - h));
+            dragLift.Target = 0;
 
             // Keep every frame coming while it's held
             settleFrames = 2;
@@ -296,6 +460,10 @@ namespace Islet
             grab.Snap(middle - pointer.X);
             grab.Target = 0;
 
+            dockY.Configure(0.07, 1);
+            dockY.Snap(Top);
+            grabY = pointer.Y - Top;
+
             lastPointerX = double.NaN;
             dragVelocity = 0;
             centred = false;
@@ -308,7 +476,7 @@ namespace Islet
 
             backdrop?.ShowCentre(false);
 
-            Mouse.OverrideCursor = Cursors.SizeWE;
+            Mouse.OverrideCursor = Cursors.SizeAll;
             IslandContainer.CaptureMouse();
 
             UpdateSurface();
@@ -334,9 +502,13 @@ namespace Islet
             if (DragFlair)
                 stretch.Velocity += 1.2;
 
-            // It stays where it was let go, without carrying on past it
+            // It stays where it was let go along the edge, without carrying on past it
             double x = Math.Clamp(dockX.Target, 0, ScreenWidth);
             dockX.Velocity *= 0.15;
+            dockY.Velocity *= 0.3;
+
+            // Up or down, it goes to the nearer edge: never left in between
+            Settings.IslandEdge = EdgeFor(PointerPosition().Y, ScreenHeight);
 
             // Saving applies the settings, which settles it there
             Settings.IslandX = ScreenWidth > 0 ? x / ScreenWidth : 0.5;
@@ -355,5 +527,31 @@ namespace Islet
 
         [DllImport("user32.dll")]
         static extern bool GetCursorPos(out CursorPoint point);
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct WindowRect
+        {
+            public int Left, Top, Right, Bottom;
+        }
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        static extern IntPtr FindWindow(string className, string? windowName);
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct AppBarData
+        {
+            public uint Size;
+            public IntPtr Window;
+            public uint CallbackMessage;
+            public uint Edge;
+            public WindowRect Rect;
+            public IntPtr Param;
+        }
+
+        [DllImport("shell32.dll")]
+        static extern IntPtr SHAppBarMessage(uint message, ref AppBarData data);
+
+        [DllImport("user32.dll")]
+        static extern bool GetWindowRect(IntPtr window, out WindowRect rect);
     }
 }

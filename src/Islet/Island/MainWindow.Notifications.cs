@@ -95,7 +95,7 @@ namespace Islet
             // On the curve of the corner, a little outside it, like an app's unread badge
             NotifyDot.Margin = new Thickness(
                 visualLeft + w * scale - corner * 0.3 - size / 2,
-                IslandContainer.Margin.Top + corner * 0.3 - size / 2, 0, 0);
+                IslandTopInWindow(height.Value * scale) + corner * 0.3 - size / 2, 0, 0);
         }
 
         void NotifyDot_Click(object sender, MouseButtonEventArgs e) => OpenUrl("ms-actioncenter:");

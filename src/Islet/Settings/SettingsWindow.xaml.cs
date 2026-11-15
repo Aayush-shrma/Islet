@@ -110,7 +110,11 @@ namespace Islet
                 out performanceNote);
 
             var position = Group("Position");
-            Row(position, "Where it sits", "Hold the island for a second, then drag it anywhere along the top.",
+            ChoiceRow(position, "Edge", "At the bottom it sits above the taskbar and opens upwards.",
+                new[] { "Top", "Bottom" },
+                (int)Settings.IslandEdge,
+                i => { Settings.IslandEdge = (IslandEdge)i; Settings.Save(); });
+            Row(position, "Where it sits", "Hold the island for a second, then drag it anywhere along the top or bottom.",
                 PillButton("Move to the centre", () =>
                 {
                     Settings.IslandX = 0.5;
@@ -251,6 +255,11 @@ namespace Islet
                 new[] { "Off", "2 min", "5 min", "10 min" },
                 Math.Max(0, Array.IndexOf(screensaverMinutes, Settings.ScreensaverMinutes)),
                 i => { Settings.ScreensaverMinutes = screensaverMinutes[i]; Settings.Save(); });
+
+            var online = Group("Looked up online");
+            SwitchRow(online, "Look things up online",
+                "Covers for music videos and for songs sent without one, music videos checked against Deezer and iTunes, and your listening stats' missing covers. Only song, artist and album names are sent. Off, none of these leave this PC; lyrics (LRCLIB) and weather have their own switches.",
+                Settings.LookUpOnline, v => { Settings.LookUpOnline = v; Settings.Save(); });
 
             var account = Group("Spotify account");
             Row(account, "Like button",
@@ -543,6 +552,10 @@ namespace Islet
                 : "Updates are signed, and checked before they're installed.";
             ShowUpdateNotes(island.AvailableUpdate);
 
+            // With no update waiting, what's new in the version installed
+            if (island.AvailableUpdate == null)
+                _ = ShowInstalledNotesAsync();
+
             SwitchRow(updates, "Check for updates automatically", "At launch and every 12 hours.",
                 Settings.AutoUpdate, v => { Settings.AutoUpdate = v; Settings.Save(); });
 
@@ -577,6 +590,15 @@ namespace Islet
                 ? $"Version {release.Version} is available." +
                   (UpdateService.CanSelfUpdate ? "" : " This copy wasn't installed by the installer, so Install opens the download page.")
                 : "You're up to date.";
+        }
+
+        async Task ShowInstalledNotesAsync()
+        {
+            var version = UpdateService.CurrentVersion;
+            var notes = await UpdateService.NotesForAsync(null, version);
+
+            if (notes.Count > 0 && island.AvailableUpdate == null && IsLoaded)
+                ShowUpdateNotes(new UpdateService.Release(version, $"v{version}", "", "", "") { Notes = notes });
         }
 
         // What's new in the update found, a short line each, under the update row

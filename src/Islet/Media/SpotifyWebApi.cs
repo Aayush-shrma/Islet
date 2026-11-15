@@ -262,6 +262,66 @@ namespace Islet
             return await http.SendAsync(request);
         }
 
+        /// <summary>
+        /// The Spotify URI ("spotify:track:…") of a track, album or artist by name, when connected and
+        /// Spotify has one that matches; null otherwise, for a search to do instead.
+        /// </summary>
+        public async Task<string?> FindAsync(string kind, string name, string? artist)
+        {
+            if (!IsConnected || string.IsNullOrWhiteSpace(name))
+                return null;
+
+            string query = kind == "artist" ? $"artist:\"{name}\""
+                : artist == null ? $"{kind}:\"{name}\""
+                : $"{kind}:\"{name}\" artist:\"{artist}\"";
+
+            try
+            {
+                using var response = await SendAsync(HttpMethod.Get,
+                    $"/search?type={kind}&limit=5&q=" + Uri.EscapeDataString(query));
+
+                if (response == null)
+                {
+                    Log.Info($"Spotify search for {kind} '{name}': not signed in");
+                    return null;
+                }
+
+                string body = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    Log.Info($"Spotify search for {kind} '{name}' answered {(int)response.StatusCode}: {body[..Math.Min(body.Length, 200)]}");
+                    return null;
+                }
+
+                using var doc = JsonDocument.Parse(body);
+
+                if (!doc.RootElement.TryGetProperty(kind + "s", out var found) || !found.TryGetProperty("items", out var items))
+                {
+                    Log.Info($"Spotify search for {kind} '{name}' came back without {kind}s");
+                    return null;
+                }
+
+                // The first whose name is the one asked for
+                foreach (var item in items.EnumerateArray())
+                {
+                    if (item.ValueKind == JsonValueKind.Object &&
+                        ArtworkService.Normalize(item.GetProperty("name").GetString()) is string got &&
+                        got.Length > 0 && (got == ArtworkService.Normalize(name) || got.StartsWith(ArtworkService.Normalize(name))) &&
+                        item.TryGetProperty("uri", out var uri))
+                        return uri.GetString();
+                }
+
+                Log.Info($"Spotify search for {kind} '{name}' found {items.GetArrayLength()}, none named that");
+            }
+            catch (Exception ex)
+            {
+                Log.Info($"Spotify search for {kind} '{name}' failed: {ex.Message}");
+            }
+
+            return null;
+        }
+
         /// <summary>The Spotify URI and title of the track playing right now.</summary>
         public async Task<(string Uri, string Title)?> GetCurrentTrackAsync()
         {

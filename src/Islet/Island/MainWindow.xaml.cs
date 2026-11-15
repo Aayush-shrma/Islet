@@ -138,7 +138,7 @@ namespace Islet
         {
             InitializeComponent();
 
-            springs = new[] { width, height, islandOpacity, islandScale, volumeLevel, volumeRow, glow, heartScale, seekGrow, discSpeed, artPop, peekLift, openRows, dockX, grab, dragLift, dragPop, stretch, lean, backdropLevel, shelfScroll };
+            springs = new[] { width, height, islandOpacity, islandScale, volumeLevel, volumeRow, glow, heartScale, seekGrow, discSpeed, artPop, peekLift, openRows, dockX, dockY, grab, dragLift, dragPop, stretch, lean, backdropLevel, shelfScroll };
 
             compactMusicPanel = AddPanel(CompactMusic, 0.88);
             smallMusicPanel = AddPanel(SmallMusic, 0.88);
@@ -261,6 +261,13 @@ namespace Islet
             notifications.Received += EnqueueChat;
             SetUpQuietDot();
             updateTimer.Tick += async (s, e) => await CheckForUpdatesAsync(announce: true);
+
+            // A few seconds in, once the island has settled
+            _ = Dispatcher.InvokeAsync(async () =>
+            {
+                await Task.Delay(TimeSpan.FromSeconds(4));
+                await SayWhatsNewAsync();
+            });
             App.SecondInstanceLaunched += () => OpenSettings();
 
             clockTimer.Tick += (s, e) =>
@@ -558,6 +565,8 @@ namespace Islet
                 _ => (236.0, 38.0, compactMusicPanel)
             };
 
+            HoverPad.Visibility = next == Surface.LineMusic ? Visibility.Visible : Visibility.Collapsed;
+
             bool expanding = next is Surface.ExpandedMusic or Surface.ExpandedAmbient
                 or Surface.Peek or Surface.Notify or Surface.Shelf or Surface.Palette or Surface.Locks;
 
@@ -738,6 +747,16 @@ namespace Islet
             IslandContainer.Opacity = Math.Clamp(islandOpacity.Value, 0, 1);
             PlaceIsland(w);
 
+            // These views are built for their largest size and opened to less; they're made exactly
+            // as tall as the opening, so neither edge of the screen cuts into what they show
+            FitToOpening(surface switch
+            {
+                Surface.Shelf => ShelfPanel,
+                Surface.Palette => PalettePanel,
+                Surface.Locks => LocksPanel,
+                _ => null
+            });
+
             if (surface == Surface.Hidden && islandOpacity.Value < 0.02)
                 IslandContainer.IsHitTestVisible = false;
 
@@ -745,6 +764,12 @@ namespace Islet
             PlaceQuietDot();
             ApplyShelf();
             PlaceColorPill();
+        }
+
+        void FitToOpening(FrameworkElement? view)
+        {
+            if (view != null && Math.Abs(view.Height - height.Target) > 0.5)
+                view.Height = height.Target;
         }
 
         static void ApplyPanel(Panel panel)
@@ -1269,7 +1294,10 @@ namespace Islet
             }
             catch (Exception ex)
             {
-                Log.Error("Reading the media session failed", ex);
+                if (ex is System.Runtime.InteropServices.COMException)
+                    Log.Info("The player went away mid-read: " + ex.Message);
+                else
+                    Log.Error("Reading the media session failed", ex);
                 TrackTitle.Text = "Player unavailable";
                 TrackArtist.Text = "Couldn't read what's playing";
             }
@@ -1293,6 +1321,9 @@ namespace Islet
                 return;
 
             // Spotify now and then hands Windows a song with no cover at all
+            if (!Settings.LookUpOnline)
+                return;
+
             bool appSentNone = info.Source != MediaSource.Browser && info.Artwork == null;
 
             if (!appSentNone && (!Settings.FindVideoArt || info.Source != MediaSource.Browser))
@@ -1480,6 +1511,31 @@ namespace Islet
 
         // ================= Updates =================
 
+        // Once, the first time a new version opens: what's new in it, dropping out of the island
+        async Task SayWhatsNewAsync()
+        {
+            var current = UpdateService.CurrentVersion;
+            string? last = Settings.LastSeenVersion;
+
+            Settings.LastSeenVersion = current.ToString();
+            Settings.Save();
+
+            // A first install has nothing to compare with; a dev build may be behind what was seen
+            if (last == null || !Version.TryParse(last, out var before) || before >= current)
+                return;
+
+            var notes = await UpdateService.NotesForAsync(before, current);
+
+            Enqueue(new NotifyItem(
+                "Islet",
+                $"Updated to {current}",
+                notes.Count > 0 ? string.Join(" · ", notes.Take(2)) : "See what's new in Settings, under About.",
+                null,
+                Color.FromRgb(10, 132, 255),
+                0xE789,
+                () => OpenSettings("About")));
+        }
+
         async Task CheckForUpdatesAsync(bool announce)
         {
             availableUpdate = await UpdateService.CheckAsync();
@@ -1625,31 +1681,59 @@ namespace Islet
             }
         }
 
+        // A search in the Spotify app; on the web only when the app isn't there
         void OpenSpotifySearch(string query)
         {
-            if (!string.IsNullOrWhiteSpace(query))
+            if (string.IsNullOrWhiteSpace(query))
+                return;
+
+            try
+            {
+                Process.Start(new ProcessStartInfo { FileName = "spotify:search:" + Uri.EscapeDataString(query), UseShellExecute = true });
+            }
+            catch
+            {
                 OpenUrl("https://open.spotify.com/search/" + Uri.EscapeDataString(query));
+            }
         }
 
         void OpenSpotify_Click(object sender, RoutedEventArgs e) => OpenUrl("spotify:");
 
         bool IsSpotifyTrack => track?.Source == MediaSource.Spotify || likeUri != null;
 
-        void TrackTitle_Click(object sender, MouseButtonEventArgs e)
+        // With Spotify connected, the album or artist itself opens in the app; otherwise a search
+        async void TrackTitle_Click(object sender, MouseButtonEventArgs e)
         {
             if (track == null || !IsSpotifyTrack)
                 return;
 
-            if (!string.IsNullOrWhiteSpace(track.Album))
-                OpenSpotifySearch("album:" + track.Album + " artist:" + track.Artist);
+            var info = track;
+            bool album = !string.IsNullOrWhiteSpace(info.Album);
+            string? uri = await spotifyWeb.FindAsync(album ? "album" : "track", album ? info.Album : info.Title, info.Artist);
+
+            if (uri != null)
+                OpenUrl(uri);
+            else if (album)
+                OpenSpotifySearch("album:" + info.Album + " artist:" + info.Artist);
             else
-                OpenSpotifySearch(track.Title + " " + track.Artist);
+                OpenSpotifySearch(info.Title + " " + info.Artist);
         }
 
-        void TrackArtist_Click(object sender, MouseButtonEventArgs e)
+        async void TrackArtist_Click(object sender, MouseButtonEventArgs e)
         {
-            if (track != null && IsSpotifyTrack)
-                OpenSpotifySearch("artist:" + track.Artist);
+            if (track == null || !IsSpotifyTrack)
+                return;
+
+            string artist = track.Artist;
+            OpenUrlOr(await spotifyWeb.FindAsync("artist", artist, null), () => OpenSpotifySearch("artist:" + artist));
+        }
+
+        static void OpenUrlOr(string? url, Action otherwise)
+        {
+            if (url != null)
+                OpenUrl(url);
+            else
+                otherwise();
         }
 
         async void Previous_Click(object sender, RoutedEventArgs e)
