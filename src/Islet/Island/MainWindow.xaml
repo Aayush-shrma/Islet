@@ -1380,90 +1380,89 @@
                         <ScaleTransform/>
                     </Grid.RenderTransform>
 
-                    <Grid Margin="26,20,22,16">
+                    <!-- Two columns: the time, the date and the day's music on the left; the weather
+                         and the buttons on the right -->
+                    <Grid Margin="26,18,20,14">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="*"/>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock x:Name="AmbientTime"
-                                       Text="10:42"
-                                       Foreground="White"
-                                       FontSize="40"
-                                       FontWeight="Light"/>
-                            <TextBlock x:Name="AmbientDate"
-                                       Text="Wednesday, October 29"
-                                       Foreground="#99FFFFFF"
-                                       FontSize="13"
-                                       Margin="2,-2,0,0"/>
-                        </StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
 
-                        <StackPanel x:Name="AmbientWeather"
-                                    HorizontalAlignment="Right"
-                                    VerticalAlignment="Center">
-                            <StackPanel Orientation="Horizontal"
-                                        HorizontalAlignment="Right">
-                                <TextBlock x:Name="AmbientWeatherGlyph"
-                                           FontFamily="{StaticResource IconFont}"
-                                           Foreground="#FFD60A"
-                                           FontSize="24"
-                                           Margin="0,4,8,0"
-                                           VerticalAlignment="Center"/>
-                                <TextBlock x:Name="AmbientTemp"
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock x:Name="AmbientTime"
+                                           Text="10:42"
                                            Foreground="White"
-                                           FontSize="30"
-                                           FontWeight="Light"
-                                           VerticalAlignment="Center"/>
+                                           FontSize="40"
+                                           FontWeight="Light"/>
+                                <TextBlock x:Name="AmbientDate"
+                                           Text="Wednesday, October 29"
+                                           Foreground="#99FFFFFF"
+                                           FontSize="13"
+                                           Margin="2,-2,0,0"/>
+
+                                <!-- The day's music, under the date like a lock-screen line -->
+                                <StackPanel Orientation="Horizontal"
+                                            Margin="2,9,0,0">
+                                    <TextBlock Text="&#xE8D6;"
+                                               FontFamily="{StaticResource IconFont}"
+                                               Foreground="#1ED760"
+                                               FontSize="11"
+                                               Margin="0,1,6,0"
+                                               VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="AmbientCaption"
+                                               Text="Nothing playing"
+                                               Foreground="#B3FFFFFF"
+                                               FontSize="11.5"
+                                               FontWeight="Medium"
+                                               TextTrimming="CharacterEllipsis"
+                                               MaxWidth="190"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
                             </StackPanel>
-                            <TextBlock x:Name="AmbientWeatherText"
-                                       Foreground="#99FFFFFF"
-                                       FontSize="12"
-                                       HorizontalAlignment="Right"/>
-                        </StackPanel>
 
-                        <DockPanel Grid.Row="1"
-                                   LastChildFill="False">
-                            <TextBlock x:Name="AmbientCaption"
-                                       Text="Nothing playing"
-                                       Style="{StaticResource Caption}"
-                                       TextTrimming="CharacterEllipsis"
-                                       MaxWidth="250"
-                                       VerticalAlignment="Center"/>
+                            <Grid Grid.Column="1"
+                                  Margin="12,0,0,0">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
 
-                            <Button DockPanel.Dock="Right"
-                                    Content="&#xE713;"
-                                    Click="Settings_Click"
-                                    Style="{StaticResource IconButton}"
-                                    Foreground="#80FFFFFF"
-                                    FontSize="14"
-                                    Width="32"
-                                    Height="32"
-                                    ToolTip="Settings"/>
+                                <StackPanel x:Name="AmbientWeather"
+                                            HorizontalAlignment="Right"
+                                            Margin="0,0,4,0">
+                                    <StackPanel Orientation="Horizontal"
+                                                HorizontalAlignment="Right">
+                                        <TextBlock x:Name="AmbientWeatherGlyph"
+                                                   FontFamily="{StaticResource IconFont}"
+                                                   Foreground="#FFD60A"
+                                                   FontSize="24"
+                                                   Margin="0,4,8,0"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="AmbientTemp"
+                                                   Foreground="White"
+                                                   FontSize="30"
+                                                   FontWeight="Light"
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                    <TextBlock x:Name="AmbientWeatherText"
+                                               Foreground="#99FFFFFF"
+                                               FontSize="12"
+                                               HorizontalAlignment="Right"/>
+                                </StackPanel>
 
-                            <Button DockPanel.Dock="Right"
-                                    Content="&#xE916;"
-                                    Click="TimerToggle_Click"
-                                    Style="{StaticResource IconButton}"
-                                    Foreground="#80FFFFFF"
-                                    FontSize="14"
-                                    Width="32"
-                                    Height="32"
-                                    ToolTip="Timer"/>
-
-                            <Button DockPanel.Dock="Right"
-                                    Content="&#xEF3C;"
-                                    Click="PickColor_Click"
-                                    Style="{StaticResource IconButton}"
-                                    Foreground="#80FFFFFF"
-                                    FontSize="14"
-                                    Width="32"
-                                    Height="32"
-                                    ToolTip="Pick a colour from the screen"/>
-
-                            <!-- Spotify's logo, the size of the icons beside it, so the summary keeps its room -->
-                            <Button DockPanel.Dock="Right"
+                                <StackPanel Grid.Row="2"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            Margin="0,8,0,0">
+                            <!-- Spotify's logo, the size of the icons beside it -->
+                            <Button
                                     Click="OpenSpotify_Click"
                                     Cursor="Hand"
                                     Focusable="False"
@@ -1494,10 +1493,39 @@
                                     </ControlTemplate>
                                 </Button.Template>
                             </Button>
-                        </DockPanel>
+
+                                    <Button Content="&#xEF3C;"
+                                            Click="PickColor_Click"
+                                            Style="{StaticResource IconButton}"
+                                            Foreground="#80FFFFFF"
+                                            FontSize="14"
+                                            Width="32"
+                                            Height="32"
+                                            ToolTip="Pick a colour from the screen"/>
+
+                                    <Button Content="&#xE916;"
+                                            Click="TimerToggle_Click"
+                                            Style="{StaticResource IconButton}"
+                                            Foreground="#80FFFFFF"
+                                            FontSize="14"
+                                            Width="32"
+                                            Height="32"
+                                            ToolTip="Timer"/>
+
+                                    <Button Content="&#xE713;"
+                                            Click="Settings_Click"
+                                            Style="{StaticResource IconButton}"
+                                            Foreground="#80FFFFFF"
+                                            FontSize="14"
+                                            Width="32"
+                                            Height="32"
+                                            ToolTip="Settings"/>
+                                </StackPanel>
+                            </Grid>
+                        </Grid>
 
                         <local:TimerCard x:Name="AmbientTimerCard"
-                                         Grid.Row="2"/>
+                                         Grid.Row="1"/>
                     </Grid>
                 </Grid>
             </Grid>

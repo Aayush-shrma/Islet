@@ -40,7 +40,7 @@ namespace Islet
                 listening.Add(now, track.Artist, track.Title, TimeSpan.FromSeconds(gap), track.Album, EffectiveArt(track, trackKey),
                     track.Site ?? track.SourceName, track.PositionAt(DateTimeOffset.Now));
 
-            AmbientCaption.Text = (Settings.DailyMusicSummary ? ListeningStats.Describe(listening.For(now)) : null)
+            AmbientCaption.Text = (Settings.DailyMusicSummary ? ListeningStats.DescribeShort(listening.For(now)) : null)
                 ?? "Nothing playing";
 
             ShowEveningSummary(now);
