@@ -77,6 +77,8 @@ namespace Islet
             peekMusicPanel, peekNotifyPanel, expandedMusicPanel, expandedAmbientPanel, timerPillPanel;
 
         readonly Rectangle[] compactBars;
+        readonly Rectangle[] tinyBars;
+        readonly Panel tinyMusicPanel, lineMusicPanel;
         readonly Rectangle[] smallBars;
         readonly Rectangle[] expandedBars;
         readonly Rectangle[] peekBars;
@@ -147,6 +149,8 @@ namespace Islet
             statusSmallPanel = AddPanel(StatusSmall, 0.88);
             statusRingPanel = AddPanel(StatusRing, 0.7);
             notchPanel = AddPanel(NotchPanel, 0.9);
+            tinyMusicPanel = AddPanel(TinyMusic, 0.88);
+            lineMusicPanel = AddPanel(LineMusic, 0.9);
             peekMusicPanel = AddPanel(PeekMusic, 0.9, 0.3);
             peekNotifyPanel = AddPanel(PeekNotify, 0.9, 0.3);
             expandedMusicPanel = AddPanel(ExpandedMusic, 0.9, 0.42);
@@ -158,6 +162,8 @@ namespace Islet
 
             compactBars = CreateBars(CompactBars, 3, 1.5);
             smallBars = CreateBars(SmallBars, 2, 1);
+            tinyBars = CreateBars(TinyBars, 1.5, 1.5, 3);
+            LineProgress.Background = barBrush;
             expandedBars = CreateBars(ExpandedBars, 3.5, 1.75);
             peekBars = CreateBars(PeekBars, 3, 1.5);
             ApplyOrbColor(accentColor);
@@ -318,9 +324,9 @@ namespace Islet
             return panel;
         }
 
-        Rectangle[] CreateBars(StackPanel host, double barWidth, double gap)
+        Rectangle[] CreateBars(StackPanel host, double barWidth, double gap, int count = 0)
         {
-            var result = new Rectangle[AudioVisualizer.BandCount];
+            var result = new Rectangle[count > 0 ? count : AudioVisualizer.BandCount];
 
             for (int i = 0; i < result.Length; i++)
             {
@@ -529,7 +535,9 @@ namespace Islet
             (double w, double h, Panel? active) = next switch
             {
                 Surface.Hidden => (100.0, 28.0, null),
-                Surface.Notch => (112.0, 30.0, notchPanel),
+                Surface.Notch => (64.0, 24.0, notchPanel),
+                Surface.TinyMusic => (84.0, 24.0, tinyMusicPanel),
+                Surface.LineMusic => (120.0, 10.0, lineMusicPanel),
                 Surface.SmallMusic => (112.0, 30.0, smallMusicPanel),
                 Surface.MiniMusic => (38.0, 38.0, miniMusicPanel),
                 Surface.MiniIdle => (30.0, 30.0, miniIdlePanel),
@@ -756,6 +764,7 @@ namespace Islet
         {
             bool visible = compactMusicPanel.Element.Visibility == Visibility.Visible ||
                            smallMusicPanel.Element.Visibility == Visibility.Visible ||
+                           tinyMusicPanel.Element.Visibility == Visibility.Visible ||
                            expandedMusicPanel.Element.Visibility == Visibility.Visible ||
                            peekMusicPanel.Element.Visibility == Visibility.Visible;
 
@@ -849,6 +858,20 @@ namespace Islet
                            0.2 * Math.Sin(t * (8.3 + i * 0.9) + i * 2.1);
                 audioLevels[i] = (float)Math.Clamp(v, 0.05, 1);
             }
+        }
+
+        // The Line look: how far through the song, eased along once a second rather than
+        // redrawn every frame, so it costs nothing while it sits there
+        void UpdateLineProgress()
+        {
+            if (lineMusicPanel.Element.Visibility != Visibility.Visible || track == null || track.Duration <= TimeSpan.Zero)
+                return;
+
+            double fraction = Math.Clamp(track.PositionAt(DateTimeOffset.Now) / track.Duration, 0, 1);
+            double width = Math.Max(0, LineTrack.ActualWidth) * fraction;
+
+            LineProgress.BeginAnimation(WidthProperty, new System.Windows.Media.Animation.DoubleAnimation(width, TimeSpan.FromSeconds(track.Playing ? 1 : 0.3)));
+            LineProgress.Opacity = track.Playing ? 1 : 0.45;
         }
 
         bool UpdateProgress()
@@ -1152,6 +1175,7 @@ namespace Islet
                     SmallAlbumArt.Source = null;
                     AlbumArt.Source = null;
                     DiscArt.Fill = null;
+                    TinyArt.Fill = null;
                     playing = false;
                     pausedSince = null;
                     trackKey = "";
@@ -1322,6 +1346,7 @@ namespace Islet
             AlbumArt.Source = art;
             PeekArt.Source = art;
             DiscArt.Fill = art == null ? null : new ImageBrush(art) { Stretch = Stretch.UniformToFill };
+            TinyArt.Fill = DiscArt.Fill;
             ApplyAlbumTheme(art);
             UpdateCoverBackdrop();
 
@@ -1512,6 +1537,8 @@ namespace Islet
             string time = now.ToString(Settings.Use24HourClock ? "HH:mm" : "h:mm");
 
             CompactTime.Text = time;
+            TinyTime.Text = time;
+            UpdateLineProgress();
             AmbientTime.Text = time;
             AmbientDate.Text = now.ToString("dddd, MMMM d");
 

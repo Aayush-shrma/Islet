@@ -14,6 +14,10 @@ namespace Islet
 
     public enum IdleMode
     {
+        /// <summary>
+        /// A tiny pill with just the time. (Named for what it used to be, a camera notch;
+        /// settings are saved by name, so the name stays.)
+        /// </summary>
         Notch,
         Hide,
         Clock,
@@ -32,7 +36,13 @@ namespace Islet
     {
         Pill,
         Disc,
-        Small
+        Small,
+
+        /// <summary>A tiny pill: a round cover and three thin bars.</summary>
+        Tiny,
+
+        /// <summary>A slim line at the top of the screen that fills as the song plays.</summary>
+        Line
     }
 
     public enum IslandTheme

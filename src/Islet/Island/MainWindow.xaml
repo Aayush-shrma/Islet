@@ -280,6 +280,61 @@
                                      VerticalAlignment="Center"/>
                 </Grid>
 
+                <!-- ===== Tiny: music, a round cover and three thin bars ===== -->
+                <Grid x:Name="TinyMusic"
+                      Width="84"
+                      Height="24"
+                      HorizontalAlignment="Center"
+                      VerticalAlignment="Top"
+                      RenderTransformOrigin="0.5,0.5">
+                    <Grid.RenderTransform>
+                        <ScaleTransform/>
+                    </Grid.RenderTransform>
+
+                    <Ellipse Width="16"
+                             Height="16"
+                             Margin="5,0,0,0"
+                             Fill="#1C1C1E"
+                             HorizontalAlignment="Left"
+                             VerticalAlignment="Center"/>
+                    <Ellipse x:Name="TinyArt"
+                             Width="16"
+                             Height="16"
+                             Margin="5,0,0,0"
+                             HorizontalAlignment="Left"
+                             VerticalAlignment="Center"/>
+
+                    <StackPanel x:Name="TinyBars"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Height="12"
+                                Margin="0,0,10,0"/>
+                </Grid>
+
+                <!-- ===== Line: music, a slim bar that fills as the song plays ===== -->
+                <Grid x:Name="LineMusic"
+                      Width="120"
+                      Height="10"
+                      HorizontalAlignment="Center"
+                      VerticalAlignment="Top"
+                      RenderTransformOrigin="0.5,0.5">
+                    <Grid.RenderTransform>
+                        <ScaleTransform/>
+                    </Grid.RenderTransform>
+
+                    <Grid x:Name="LineTrack"
+                          Height="3"
+                          Margin="9,0,9,0"
+                          VerticalAlignment="Center">
+                        <Border Background="#2EFFFFFF" CornerRadius="1.5"/>
+                        <Border x:Name="LineProgress"
+                                CornerRadius="1.5"
+                                HorizontalAlignment="Left"
+                                Width="0"/>
+                    </Grid>
+                </Grid>
+
                 <!-- ===== Mini: album art spinning in a small circle ===== -->
                 <Grid x:Name="MiniMusic"
                       Width="38"
@@ -564,39 +619,26 @@
                                VerticalAlignment="Center"/>
                 </Grid>
 
-                <!-- ===== Camera notch (idle) ===== -->
+                <!-- ===== Tiny clock (idle): just the time ===== -->
                 <Grid x:Name="NotchPanel"
-                      Width="112"
-                      Height="30"
+                      Width="64"
+                      Height="24"
                       HorizontalAlignment="Center"
                       VerticalAlignment="Top">
-                    <Ellipse Width="11"
-                             Height="11"
-                             Margin="0,0,11,0"
-                             HorizontalAlignment="Right"
-                             VerticalAlignment="Center">
-                        <Ellipse.Fill>
-                            <RadialGradientBrush GradientOrigin="0.35,0.35">
-                                <GradientStop Color="#2A2F45" Offset="0"/>
-                                <GradientStop Color="#10121C" Offset="0.6"/>
-                                <GradientStop Color="#050508" Offset="1"/>
-                            </RadialGradientBrush>
-                        </Ellipse.Fill>
-                    </Ellipse>
-                    <Ellipse Width="2.5"
-                             Height="2.5"
-                             Margin="0,0,15.5,3"
-                             Fill="#556A7BFF"
-                             HorizontalAlignment="Right"
-                             VerticalAlignment="Center"/>
+                    <TextBlock x:Name="TinyTime"
+                               Text="10:42"
+                               Foreground="#E6FFFFFF"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"/>
 
+                    <!-- Unused here: a running timer gets the timer pill instead -->
                     <local:TimerFace x:Name="NotchTimer"
                                      Form="Stacked"
-                                     Width="64"
-                                     Height="20"
-                                     Margin="14,0,0,0"
-                                     HorizontalAlignment="Left"
-                                     VerticalAlignment="Center"/>
+                                     Width="0"
+                                     Height="0"
+                                     Visibility="Collapsed"/>
                 </Grid>
 
                 <!-- ===== Timer alone, when the island would otherwise be hidden ===== -->

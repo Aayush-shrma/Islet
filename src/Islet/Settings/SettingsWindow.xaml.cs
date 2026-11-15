@@ -92,8 +92,8 @@ namespace Islet
                 (int)Settings.Size,
                 i => { Settings.Size = (IslandSize)i; Settings.Save(); });
 
-            ChoiceRow(look, "While music plays", "The island's shape when it isn't open.",
-                new[] { "Pill with bars", "Spinning album art", "Small pill" },
+            ChoiceRow(look, "While music plays", "The island's shape when it isn't open. Tiny and Line keep out of the way.",
+                new[] { "Pill with bars", "Spinning album art", "Small pill", "Tiny", "Line" },
                 (int)Settings.MusicLook,
                 i => { Settings.MusicLook = (MusicLook)i; Settings.Save(); });
 
@@ -120,7 +120,7 @@ namespace Islet
             var idle = Group("When nothing is playing");
 
             ChoiceRow(idle, "Idle look", null,
-                new[] { "Camera notch", "Hide", "Clock", "Clock + weather", "Circle" },
+                new[] { "Tiny clock", "Hide", "Clock", "Clock + weather", "Circle" },
                 (int)Settings.IdleMode,
                 i =>
                 {
