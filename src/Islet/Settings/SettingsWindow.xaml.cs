@@ -133,6 +133,11 @@ namespace Islet
                     _ = island.RefreshWeatherAsync();
                 });
 
+            ChoiceRow(idle, "Date", "Nepal's calendar (Bikram Sambat) on the island, in English letters or Nepali.",
+                new[] { "Usual", "Nepali", "नेपाली" },
+                (int)Settings.NepaliDate,
+                i => { Settings.NepaliDate = (NepaliDateStyle)i; Settings.Save(); });
+
             int[] delays = { 5, 15, 60, 0 };
             ChoiceRow(idle, "Go idle after the music pauses for", null,
                 new[] { "5 sec", "15 sec", "1 min", "Only when closed" },
@@ -219,9 +224,6 @@ namespace Islet
             SwitchRow(sources, "Music in your browser",
                 "Spotify Web, YouTube Music, SoundCloud, Apple Music on the web and more, in Chrome, Edge, Firefox, Opera or Brave.",
                 Settings.SourceBrowsers, v => { Settings.SourceBrowsers = v; Settings.Save(); });
-            SwitchRow(sources, "Music videos as songs",
-                "Official music videos, lyric videos and audio uploads on YouTube show as the song, with its album cover, and count in your listening stats. Other videos stay off. Checked against Deezer and iTunes by song name.",
-                Settings.MusicVideosAsSongs, v => { Settings.MusicVideosAsSongs = v; Settings.Save(); });
             SwitchRow(sources, "Videos on websites",
                 "YouTube, Instagram, X and other videos. Off keeps the island to music; on, a video shows once it has played for a few seconds, so previews and feed clips stay off.",
                 Settings.ShowWebVideos, v => { Settings.ShowWebVideos = v; Settings.Save(); });
@@ -232,9 +234,6 @@ namespace Islet
             var playing = Group("While it plays");
             SwitchRow(playing, "Synced lyrics", "The current line appears under the song when you open the island. Lyrics by LRCLIB.",
                 Settings.ShowLyrics, v => { Settings.ShowLyrics = v; Settings.Save(); });
-            SwitchRow(playing, "Real covers for music videos",
-                "Video sites only share a video frame, so Islet looks up the song's real cover in Apple's iTunes catalogue.",
-                Settings.FindVideoArt, v => { Settings.FindVideoArt = v; Settings.Save(); });
             SwitchRow(playing, "Real-time audio visualizer",
                 "The bars follow the actual bass, mids and treble coming out of your speakers. Turn off for a lighter animated pattern.",
                 Settings.RealAudioVisualizer, v => { Settings.RealAudioVisualizer = v; Settings.Save(); });
@@ -256,10 +255,20 @@ namespace Islet
                 Math.Max(0, Array.IndexOf(screensaverMinutes, Settings.ScreensaverMinutes)),
                 i => { Settings.ScreensaverMinutes = screensaverMinutes[i]; Settings.Save(); });
 
+            // Everything that asks Deezer or iTunes, together: the main switch, then each use of it
             var online = Group("Looked up online");
             SwitchRow(online, "Look things up online",
-                "Covers for music videos and for songs sent without one, music videos checked against Deezer and iTunes, and your listening stats' missing covers. Only song, artist and album names are sent. Off, none of these leave this PC; lyrics (LRCLIB) and weather have their own switches.",
+                "Only song, artist and album names are sent, to Deezer and Apple's iTunes. Off, none of the things below leave this PC. Lyrics (LRCLIB) and weather have their own switches.",
                 Settings.LookUpOnline, v => { Settings.LookUpOnline = v; Settings.Save(); });
+            SwitchRow(online, "Music videos as songs",
+                "Official music videos, lyric videos and audio uploads on YouTube show as the song, with its album cover, and count in your listening stats. Other videos stay off.",
+                Settings.MusicVideosAsSongs, v => { Settings.MusicVideosAsSongs = v; Settings.Save(); });
+            SwitchRow(online, "Real covers for music videos",
+                "Video sites only share a video frame, so the song's real cover is looked up. Songs a player sends without a cover get one too.",
+                Settings.FindVideoArt, v => { Settings.FindVideoArt = v; Settings.Save(); });
+            SwitchRow(online, "Missing covers in your listening stats",
+                "For songs played before covers were kept, or whose player gave none. Kept with the stats.",
+                Settings.FindStatsCovers, v => { Settings.FindStatsCovers = v; Settings.Save(); });
 
             var account = Group("Spotify account");
             Row(account, "Like button",

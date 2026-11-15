@@ -595,10 +595,10 @@
                                      Ticks="24"/>
                 </Grid>
 
-                <!-- ===== Mini: idle circle ===== -->
+                <!-- ===== Mini: idle circle, as big as the music circle ===== -->
                 <Grid x:Name="MiniIdle"
-                      Width="30"
-                      Height="30"
+                      Width="38"
+                      Height="38"
                       HorizontalAlignment="Center"
                       VerticalAlignment="Top"
                       RenderTransformOrigin="0.5,0.5">

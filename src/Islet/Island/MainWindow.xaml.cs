@@ -554,12 +554,12 @@ namespace Islet
             (double w, double h, Panel? active) = next switch
             {
                 Surface.Hidden => (100.0, 28.0, null),
-                Surface.Notch => (64.0, 24.0, notchPanel),
+                Surface.Notch => TinyClockSize(),
                 Surface.TinyMusic => (84.0, 24.0, tinyMusicPanel),
                 Surface.LineMusic => (120.0, 10.0, lineMusicPanel),
                 Surface.SmallMusic => (112.0, 30.0, smallMusicPanel),
                 Surface.MiniMusic => (38.0, 38.0, miniMusicPanel),
-                Surface.MiniIdle => (30.0, 30.0, miniIdlePanel),
+                Surface.MiniIdle => (38.0, 38.0, miniIdlePanel),
                 Surface.CompactAmbient => (210.0, 38.0, compactAmbientPanel),
                 Surface.Volume => (264.0, 38.0, volumePanel),
                 Surface.StatusSmall => (150.0, 30.0, statusSmallPanel),
@@ -774,6 +774,15 @@ namespace Islet
             PlaceQuietDot();
             ApplyShelf();
             PlaceColorPill();
+        }
+
+        // The tiny clock takes the height of the music look it follows, so the island doesn't jump in
+        // size when the music stops: 30 after the Small pill, 24 after Tiny or Line
+        (double, double, Panel?) TinyClockSize()
+        {
+            double h = Settings.MusicLook == MusicLook.Small ? 30 : 24;
+            NotchPanel.Height = h;
+            return (h == 30 ? 72.0 : 64.0, h, notchPanel);
         }
 
         void FitToOpening(FrameworkElement? view)
@@ -1622,7 +1631,7 @@ namespace Islet
             TinyTime.Text = time;
             UpdateLineProgress();
             AmbientTime.Text = time;
-            AmbientDate.Text = now.ToString("dddd, MMMM d");
+            AmbientDate.Text = DateText.IslandLong(now);
 
             bool showWeather = Settings.IdleMode == IdleMode.ClockWeather && weather != null;
 
@@ -1630,7 +1639,7 @@ namespace Islet
             CompactAmbientGlyph.Visibility = showWeather ? Visibility.Visible : Visibility.Collapsed;
             CompactAmbientText.Text = showWeather
                 ? Math.Round(weather!.Temperature) + "°"
-                : now.ToString("ddd d");
+                : DateText.IslandShort(now);
 
             AmbientWeather.Visibility = weather != null ? Visibility.Visible : Visibility.Collapsed;
 

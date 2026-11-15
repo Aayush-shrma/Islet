@@ -30,14 +30,19 @@ Islet calls these services at run time. Each has its own terms, which apply to h
 | Service | Used for | Terms |
 |---|---|---|
 | [LRCLIB](https://lrclib.net) | Synced lyrics | Free, open API. Lyrics themselves are copyrighted by their rights holders. |
-| [Apple iTunes Search API](https://performance-partners.apple.com/search-api) | Covers for music videos | Apple's terms for the Search API |
+| [Apple iTunes Search API](https://performance-partners.apple.com/search-api) | Covers, and checking music videos are real songs | Apple's terms for the Search API |
+| [Deezer API](https://developers.deezer.com/api) | Covers, and checking music videos are real songs | Deezer's API terms |
 | [Open-Meteo](https://open-meteo.com) | Weather | Free for non-commercial use; data under CC BY 4.0. Commercial use needs a paid plan. |
 | [Spotify Web API](https://developer.spotify.com) | The optional Like button | Spotify Developer Terms; each user connects their own developer app |
 | [GitHub Releases](https://github.com) | Updates | GitHub Terms of Service |
+
+## Data
+
+- The **Bikram Sambat calendar** (`src/Islet/Services/NepaliDate.cs`): the month lengths for 2070 to 2100 BS come from the published calendar, as collected by the open-source [nepali-datetime](https://github.com/amitgaru2/nepali-datetime) project.
 
 ## Fonts, icons and marks
 
 - **Segoe Fluent Icons**, **Segoe MDL2 Assets**, **Segoe UI** and **Cascadia Mono** are Windows system fonts. Islet uses them from Windows and doesn't include them.
 - The **Discord**, **WhatsApp** and **Messenger** logos drawn on message notifications are trademarks of Discord Inc. and Meta Platforms, Inc., used only to show which app a message came from.
 - **Spotify** and **Apple Music** are trademarks of Spotify AB and Apple Inc. "Dynamic Island" is a name used by Apple; Islet isn't affiliated with or endorsed by Apple.
-- The Islet app icon (`src/Islet/Assets/Islet.ico`) and the demo animation (`docs/demo.gif`) were made for this project.
+- The Islet app icon (`src/Islet/Assets/Islet.ico`) and the demo animation (`docs/demo.gif`) were made for this project. The album covers shown in the demo (*The Dark Side of the Moon* and *Use Your Illusion I*) belong to their rights holders and appear only to show Islet playing them.

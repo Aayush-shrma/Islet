@@ -254,3 +254,55 @@ public class IslandEdgeTests
     public void A_dropped_island_goes_to_the_nearer_edge(double y, IslandEdge edge) =>
         Assert.Equal(edge, MainWindow.EdgeFor(y, 1080));
 }
+
+public class NepaliDateTests
+{
+    [Theory]
+    [InlineData(2024, 4, 13, 2081, 1, 1)]   // New Year 2081
+    [InlineData(2025, 4, 14, 2082, 1, 1)]   // New Year 2082
+    [InlineData(2026, 4, 14, 2083, 1, 1)]   // New Year 2083
+    [InlineData(2026, 4, 13, 2082, 12, 30)] // the day before: the last of Chaitra
+    [InlineData(2026, 11, 15, 2083, 7, 29)] // Kartik 29
+    public void Converts_to_Bikram_Sambat(int y, int m, int d, int bsYear, int bsMonth, int bsDay) =>
+        Assert.Equal((bsYear, bsMonth, bsDay), NepaliDate.From(new DateTime(y, m, d)));
+
+    [Fact]
+    public void Writes_it_in_English_letters_or_Nepali()
+    {
+        var day = new DateTime(2026, 11, 15);
+
+        Assert.Equal("Kartik 29", NepaliDate.MonthDay(day, inNepali: false));
+        Assert.Equal("कात्तिक २९", NepaliDate.MonthDay(day, inNepali: true));
+        Assert.Equal("आइतबार, कात्तिक २९", NepaliDate.Long(day, inNepali: true));
+        Assert.Equal("२०८३", NepaliDate.Digits(2083));
+    }
+
+    [Fact]
+    public void Says_nothing_outside_its_table() =>
+        Assert.Null(NepaliDate.From(new DateTime(2000, 1, 1)));
+}
+
+public class DateTextTests
+{
+    [Fact]
+    public void Dates_follow_the_languages_own_order()
+    {
+        var before = System.Globalization.CultureInfo.CurrentCulture;
+
+        try
+        {
+            var day = new DateTime(2026, 11, 15);
+
+            System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("en-US");
+            Assert.Equal("Sunday, November 15", DateText.Long(day));
+            Assert.Equal("Sun, Nov 15", DateText.Short(day));
+
+            System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("en-GB");
+            Assert.Equal("Sunday, 15 November", DateText.Long(day));
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = before;
+        }
+    }
+}

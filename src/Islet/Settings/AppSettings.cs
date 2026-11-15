@@ -32,6 +32,18 @@ namespace Islet
         High
     }
 
+    /// <summary>How the island writes the date: the usual calendar, or Nepal's Bikram Sambat.</summary>
+    public enum NepaliDateStyle
+    {
+        Off,
+
+        /// <summary>"Kartik 29".</summary>
+        Latin,
+
+        /// <summary>"कात्तिक २९".</summary>
+        Devanagari
+    }
+
     /// <summary>Which edge of the screen the island sits on.</summary>
     public enum IslandEdge
     {
@@ -96,6 +108,9 @@ namespace Islet
         public IslandSize Size { get; set; } = IslandSize.Default;
         // Where along the top it sits, as a share of the screen's width (0.5 is the middle)
         public double IslandX { get; set; } = 0.5;
+
+        /// <summary>The island's date in Nepal's calendar (Bikram Sambat), in English letters or Nepali.</summary>
+        public NepaliDateStyle NepaliDate { get; set; }
 
         /// <summary>The top of the screen, or the bottom, just above the taskbar, growing upwards.</summary>
         public IslandEdge IslandEdge { get; set; } = IslandEdge.Top;

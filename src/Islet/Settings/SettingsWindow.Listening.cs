@@ -65,16 +65,6 @@ namespace Islet
             page.Content.Children.Add(detail);
 
             var summary = Group("Summary");
-            SwitchRow(summary, "Find missing covers online",
-                "Covers for songs whose player didn't give one, looked up on Apple's iTunes catalog by song and artist name, and kept with the stats.",
-                Settings.FindStatsCovers, v =>
-                {
-                    Settings.FindStatsCovers = v;
-                    Settings.Save();
-
-                    if (v)
-                        _ = FillCoversAsync();
-                });
             SwitchRow(summary, "Daily music summary",
                 "How long you listened today, and to whom, on the idle island at 9 PM; on Sundays, the whole week.",
                 Settings.DailyMusicSummary, v => { Settings.DailyMusicSummary = v; Settings.Save(); });
@@ -288,7 +278,7 @@ namespace Islet
             line.Children.Add(new TextBlock { Text = PeriodName(today), FontSize = 15, FontWeight = FontWeights.SemiBold });
             line.Children.Add(Faded(new TextBlock
             {
-                Text = view == StatsView.Day ? selectedDay.ToString("ddd d MMM") : $"{First:d MMM} – {Last:d MMM}",
+                Text = view == StatsView.Day ? DateText.Short(selectedDay) : DateText.Range(First, Last),
                 FontSize = 12.5,
                 Margin = new Thickness(10, 0, 0, 0),
                 VerticalAlignment = VerticalAlignment.Bottom
@@ -514,7 +504,7 @@ namespace Islet
                 var column = new Grid { Background = Brushes.Transparent, Cursor = Cursors.Hand };
                 column.RowDefinitions.Add(new RowDefinition { Height = new GridLength(Tallest + 16) });
                 column.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                column.ToolTip = $"{day:ddd d MMM}: {ListeningStats.Duration(total)}";
+                column.ToolTip = $"{DateText.Short(day)}: {ListeningStats.Duration(total)}";
 
                 // The time above the bar, for the picked day
                 var amount = new TextBlock
@@ -720,7 +710,7 @@ namespace Islet
 
             if (period.LongestSession >= TimeSpan.FromMinutes(10) && period.LongestSessionStart is DateTime start)
             {
-                string when = view == StatsView.Day ? $"From {Clock(start)}" : $"{start:ddd d MMM}, from {Clock(start)}";
+                string when = view == StatsView.Day ? $"From {Clock(start)}" : $"{DateText.Short(start)}, from {Clock(start)}";
                 spots.Add(Highlight("", "Longest session", Tight(period.LongestSession), when, null));
             }
 
@@ -735,7 +725,7 @@ namespace Islet
             if (newArtists.Count > 0)
                 spots.Add(Highlight("", "New to you",
                     newArtists.Count == 1 ? newArtists[0].Name : $"{newArtists.Count} new artists",
-                    newArtists.Count == 1 ? "First heard " + (view == StatsView.Day ? "today" : $"on {newArtists[0].FirstHeard:ddd d MMM}") : string.Join(", ", newArtists.Take(3).Select(a => a.Name)),
+                    newArtists.Count == 1 ? "First heard " + (view == StatsView.Day ? "today" : $"on {(newArtists[0].FirstHeard is DateTime heardOn ? DateText.Short(heardOn) : "")}") : string.Join(", ", newArtists.Take(3).Select(a => a.Name)),
                     newArtists.Count == 1 ? newArtists[0] : null));
             else if (newSongs.Count > 0)
                 spots.Add(Highlight("", "New to you",
@@ -985,7 +975,7 @@ namespace Islet
                 words.Children.Add(Faded(new TextBlock { Text = from, FontSize = 12.5, TextTrimming = TextTrimming.CharacterEllipsis }));
 
             if (item.FirstHeard is DateTime heard)
-                words.Children.Add(Faded(new TextBlock { Text = $"First heard {heard:d MMM yyyy}", FontSize = 11.5, Margin = new Thickness(0, 4, 0, 0) }));
+                words.Children.Add(Faded(new TextBlock { Text = $"First heard {DateText.WithYear(heard)}", FontSize = 11.5, Margin = new Thickness(0, 4, 0, 0) }));
 
             Grid.SetColumn(words, 1);
             top.Children.Add(words);
@@ -1057,7 +1047,7 @@ namespace Islet
                     Margin = new Thickness(2, 0, 2, 0),
                     CornerRadius = new CornerRadius(2.5),
                     VerticalAlignment = VerticalAlignment.Bottom,
-                    ToolTip = $"{history[i].Day:ddd d MMM}: {ListeningStats.Duration(history[i].Time)}"
+                    ToolTip = $"{DateText.Short(history[i].Day)}: {ListeningStats.Duration(history[i].Time)}"
                 };
                 bar.SetResourceReference(Border.BackgroundProperty, history[i].Time.TotalMinutes >= 1 ? "Accent" : "Control");
                 Grid.SetColumn(bar, i);
@@ -1176,7 +1166,7 @@ namespace Islet
                     StatsView.Week => "My week in music",
                     StatsView.Month => "My month in music",
                     _ => selectedDay == DateTime.Today ? "My day in music" : $"My {selectedDay:dddd} in music"
-                }, view == StatsView.Day ? selectedDay.ToString("dddd d MMMM") : $"{First:d MMM} – {Last:d MMM yyyy}", Cover);
+                }, view == StatsView.Day ? DateText.Long(selectedDay) : $"{DateText.Range(First, Last)}, {Last:yyyy}", Cover);
 
                 string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "Islet");
                 Directory.CreateDirectory(folder);
