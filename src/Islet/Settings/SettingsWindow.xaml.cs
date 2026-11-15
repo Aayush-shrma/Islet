@@ -93,7 +93,7 @@ namespace Islet
                 i => { Settings.Size = (IslandSize)i; Settings.Save(); });
 
             ChoiceRow(look, "While music plays", "The island's shape when it isn't open. Tiny and Line keep out of the way.",
-                new[] { "Pill with bars", "Spinning album art", "Small pill", "Tiny", "Line" },
+                new[] { "Pill with bars", "Circle with bars", "Small pill", "Tiny", "Line" },
                 (int)Settings.MusicLook,
                 i => { Settings.MusicLook = (MusicLook)i; Settings.Save(); });
 

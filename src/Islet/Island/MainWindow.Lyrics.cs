@@ -138,6 +138,9 @@ namespace Islet
             LyricsReset.IsEnabled = nudge != 0;
         }
 
+        // A smaller layout put off while the pointer is on the open island
+        bool shrinkHeld;
+
         void ApplyLyricsLayout()
         {
             var style = lyrics != null && Settings.ShowLyrics ? Profile.Lyrics : LyricsStyle.None;
@@ -145,12 +148,20 @@ namespace Islet
             LyricRow.Visibility = style == LyricsStyle.Line ? Visibility.Visible : Visibility.Collapsed;
             LyricStage.Visibility = style == LyricsStyle.Stage ? Visibility.Visible : Visibility.Collapsed;
             UpdateCoverBackdrop();
-            ExpandedMusic.Height = (style switch
+
+            double wanted = (style switch
             {
                 LyricsStyle.Line => 220,
                 LyricsStyle.Stage => 266,
                 _ => 172
             }) + (MusicTimerCard.Visibility == Visibility.Visible ? TimerCard.SectionHeight : 0);
+
+            // Between songs the lyrics go for a moment and come back: shrinking then would pull the
+            // island out from under the pointer, and it would close. It waits until the pointer leaves.
+            shrinkHeld = surface == Surface.ExpandedMusic && IslandContainer.IsMouseOver && wanted < ExpandedMusic.Height;
+
+            if (!shrinkHeld)
+                ExpandedMusic.Height = wanted;
 
             if (surface == Surface.ExpandedMusic)
             {

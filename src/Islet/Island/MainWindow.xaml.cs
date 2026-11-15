@@ -78,6 +78,10 @@ namespace Islet
 
         readonly Rectangle[] compactBars;
         readonly Rectangle[] tinyBars;
+        readonly Rectangle[] miniBars;
+
+        // When the player last reported nothing playing while the open island was under the pointer
+        DateTime? goneSince;
         readonly Panel tinyMusicPanel, lineMusicPanel;
         readonly Rectangle[] smallBars;
         readonly Rectangle[] expandedBars;
@@ -89,7 +93,7 @@ namespace Islet
         Surface surface = (Surface)(-1);
         bool rendering;
         TimeSpan lastFrame;
-        double discAngle, orbAngle;
+        double orbAngle;
 
         TrackInfo? track;
         bool playing;
@@ -163,6 +167,7 @@ namespace Islet
             compactBars = CreateBars(CompactBars, 3, 1.5);
             smallBars = CreateBars(SmallBars, 2, 1);
             tinyBars = CreateBars(TinyBars, 1.5, 1.5, 3);
+            miniBars = CreateBars(MiniBars, 2, 1.5, 3);
             LineProgress.Background = barBrush;
             expandedBars = CreateBars(ExpandedBars, 3.5, 1.75);
             peekBars = CreateBars(PeekBars, 3, 1.5);
@@ -223,6 +228,11 @@ namespace Islet
                 if (!IslandContainer.IsMouseOver && IslandContainer.ContextMenu?.IsOpen != true)
                 {
                     hovering = false;
+
+                    // A smaller layout put off while the pointer was on it can happen now
+                    if (shrinkHeld)
+                        ApplyLyricsLayout();
+
                     UpdateSurface();
                 }
             };
@@ -793,6 +803,7 @@ namespace Islet
             bool visible = compactMusicPanel.Element.Visibility == Visibility.Visible ||
                            smallMusicPanel.Element.Visibility == Visibility.Visible ||
                            tinyMusicPanel.Element.Visibility == Visibility.Visible ||
+                           miniMusicPanel.Element.Visibility == Visibility.Visible ||
                            expandedMusicPanel.Element.Visibility == Visibility.Visible ||
                            peekMusicPanel.Element.Visibility == Visibility.Visible;
 
@@ -837,14 +848,9 @@ namespace Islet
 
             discSpeed.Target = playing && spin ? 42 : 0;
 
-            bool disc = miniMusicPanel.Element.Visibility == Visibility.Visible;
+            // The circle while music plays shows bars now, so it doesn't spin
+            bool disc = false;
             bool orb = miniIdlePanel.Element.Visibility == Visibility.Visible && !TimerActive;
-
-            if (disc)
-            {
-                discAngle = (discAngle + discSpeed.Value * dt) % 360;
-                DiscRotate.Angle = discAngle;
-            }
 
             if (orb && !spin)
             {
@@ -1195,8 +1201,25 @@ namespace Islet
 
                 track = next;
 
+                if (next == null && hadTrack && surface == Surface.ExpandedMusic && IslandContainer.IsMouseOver &&
+                    (goneSince ??= DateTime.UtcNow) > DateTime.UtcNow - TimeSpan.FromSeconds(2))
+                {
+                    // The player is between songs; the next one usually arrives within a moment.
+                    // Until then, the open island keeps showing the last one rather than changing view.
+                    _ = Dispatcher.InvokeAsync(async () =>
+                    {
+                        await Task.Delay(600);
+                        QueueTrackUpdate();
+                    });
+                    return;
+                }
+
+                if (next != null)
+                    goneSince = null;
+
                 if (next == null)
                 {
+                    goneSince = null;
                     TrackTitle.Text = "Not playing";
                     TrackArtist.Text = "Play something to get started";
                     CompactAlbumArt.Source = null;

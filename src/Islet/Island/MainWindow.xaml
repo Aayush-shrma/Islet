@@ -357,9 +357,17 @@
                         <ScaleTransform/>
                     </Grid.RenderTransform>
 
-                    <!-- Cached so spinning only moves a texture instead of redrawing the art -->
+                    <!-- Three music bars in the circle -->
+                    <StackPanel x:Name="MiniBars"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Height="14"/>
+
+                    <!-- The album art that used to spin here; kept, hidden, as the source of the tiny view's cover -->
                     <Grid Width="30"
                           Height="30"
+                          Visibility="Collapsed"
                           RenderTransformOrigin="0.5,0.5">
                         <Grid.CacheMode>
                             <BitmapCache RenderAtScale="2"/>

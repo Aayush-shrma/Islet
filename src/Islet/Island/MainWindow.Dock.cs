@@ -71,19 +71,15 @@ namespace Islet
             edge == IslandEdge.Bottom ? Math.Max(0, BottomEdge() - Height) : 0;
 
         // Checks where the taskbar is, a few times a second, while the island sits at the bottom
-        readonly DispatcherTimer taskbarTimer = new() { Interval = TimeSpan.FromMilliseconds(120) };
+        readonly DispatcherTimer taskbarTimer = new() { Interval = TimeSpan.FromMilliseconds(60) };
         double lastBottomEdge = double.NaN;
 
-        // An auto-hidden taskbar slid up by the pointer, until the pointer leaves it
-        bool taskbarRevealed;
-
         /// <summary>
-        /// Where the bottom of the usable screen is right now. A taskbar always showing is already
-        /// left out of the work area. One set to hide itself keeps its place on screen even while
-        /// hidden (Windows 11 only slides what's in it away), so it's taken to be showing once the
-        /// pointer touches the bottom edge, and until the pointer moves off it: the island rises
-        /// above it, and settles back after. The island sits clear of that edge itself, so
-        /// hovering over the island doesn't set it off.
+        /// Where the bottom of the usable screen is right now: just above the taskbar while it's
+        /// along the bottom and showing. One set to hide itself slides almost wholly off the screen
+        /// (a couple of pixels stay, to catch the pointer), and back up for the pointer, the Windows
+        /// key or a notification; its window really moves, so following it covers every one of those,
+        /// rising with it and settling only once it has gone.
         /// </summary>
         double BottomEdge()
         {
@@ -99,22 +95,7 @@ namespace Islet
             // Along the bottom: wider than it is tall, and in the lower half of the screen
             bool alongBottom = bottomRight.X - top.X > (bottomRight.Y - top.Y) * 2 && top.Y > ScreenHeight / 2;
 
-            if (!alongBottom || !TaskbarAutoHides())
-            {
-                taskbarRevealed = false;
-                return bottom;
-            }
-
-            double pointerY = PointerPosition().Y;
-            taskbarRevealed = pointerY >= ScreenHeight - 2 || (taskbarRevealed && pointerY >= top.Y);
-
-            return taskbarRevealed ? Math.Min(ScreenHeight, top.Y) : ScreenHeight;
-        }
-
-        static bool TaskbarAutoHides()
-        {
-            var data = new AppBarData { Size = (uint)Marshal.SizeOf<AppBarData>() };
-            return (SHAppBarMessage(4 /* ABM_GETSTATE */, ref data).ToInt64() & 1 /* ABS_AUTOHIDE */) != 0;
+            return alongBottom ? Math.Min(bottom, top.Y) : bottom;
         }
 
         void FollowTaskbar()
@@ -195,7 +176,8 @@ namespace Islet
                 if (double.IsNaN(lastBottomEdge) || Math.Abs(edge - lastBottomEdge) > 1)
                 {
                     lastBottomEdge = edge;
-                    dockY.Configure(0.32, 0.86);
+                    // Quick enough to keep pace with the taskbar's own slide
+                    dockY.Configure(0.22, 0.9);
                     dockY.Target = WindowTopFor(IslandEdge.Bottom);
                     EnsureRendering();
                 }
@@ -537,19 +519,6 @@ namespace Islet
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         static extern IntPtr FindWindow(string className, string? windowName);
 
-        [StructLayout(LayoutKind.Sequential)]
-        struct AppBarData
-        {
-            public uint Size;
-            public IntPtr Window;
-            public uint CallbackMessage;
-            public uint Edge;
-            public WindowRect Rect;
-            public IntPtr Param;
-        }
-
-        [DllImport("shell32.dll")]
-        static extern IntPtr SHAppBarMessage(uint message, ref AppBarData data);
 
         [DllImport("user32.dll")]
         static extern bool GetWindowRect(IntPtr window, out WindowRect rect);
