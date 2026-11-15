@@ -127,17 +127,6 @@ namespace Islet
         void LyricsLater_Click(object sender, RoutedEventArgs e) => NudgeLyrics(0.5);
         void LyricsReset_Click(object sender, RoutedEventArgs e) => NudgeLyrics(0);
 
-        // The timing items show only with lyrics, and say where the timing is
-        void IslandMenu_Opened(object sender, RoutedEventArgs e)
-        {
-            bool has = lyricsFound != null && track != null;
-            double nudge = has ? LyricOffsets.For(track!.Artist, track.Title) : 0;
-
-            LyricsTimingMenu.Visibility = has ? Visibility.Visible : Visibility.Collapsed;
-            LyricsTimingMenu.Header = nudge == 0 ? "Lyrics timing" : $"Lyrics timing ({nudge:+0.0;-0.0} s)";
-            LyricsReset.IsEnabled = nudge != 0;
-        }
-
         // A smaller layout put off while the pointer is on the open island
         bool shrinkHeld;
 

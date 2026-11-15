@@ -144,6 +144,128 @@
             <Setter Property="FontSize" Value="11"/>
             <Setter Property="FontWeight" Value="Medium"/>
         </Style>
+        <!-- ===== The right-click menu: dark and rounded like the island ===== -->
+        <Style x:Key="MenuGlyph" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource IconFont}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="#CCFFFFFF"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="IslandMenu" TargetType="ContextMenu">
+            <Setter Property="HasDropShadow" Value="False"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Border Background="#F51C1C1E"
+                                BorderBrush="#24FFFFFF"
+                                BorderThickness="1"
+                                CornerRadius="12"
+                                Padding="5"
+                                Margin="10"
+                                MinWidth="210">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="18" ShadowDepth="4" Opacity="0.45" Color="Black"/>
+                            </Border.Effect>
+                            <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="IslandMenuItem" TargetType="MenuItem">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Grid>
+                            <Border x:Name="Bg"
+                                    Background="Transparent"
+                                    CornerRadius="7"
+                                    Padding="8,7,10,7">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="26"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="16"/>
+                                    </Grid.ColumnDefinitions>
+                                    <ContentPresenter ContentSource="Icon"
+                                                      HorizontalAlignment="Left"
+                                                      VerticalAlignment="Center"/>
+                                    <ContentPresenter Grid.Column="1"
+                                                      ContentSource="Header"
+                                                      RecognizesAccessKey="True"
+                                                      VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="2"
+                                               Text="{TemplateBinding InputGestureText}"
+                                               Foreground="#73FFFFFF"
+                                               Margin="16,0,0,0"
+                                               VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="Arrow"
+                                               Grid.Column="3"
+                                               Text="&#xE76C;"
+                                               FontFamily="{StaticResource IconFont}"
+                                               FontSize="9"
+                                               Foreground="#80FFFFFF"
+                                               HorizontalAlignment="Right"
+                                               VerticalAlignment="Center"
+                                               Visibility="Collapsed"/>
+                                </Grid>
+                            </Border>
+                            <Popup x:Name="PART_Popup"
+                                   Placement="Right"
+                                   HorizontalOffset="-4"
+                                   VerticalOffset="-15"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   PopupAnimation="Fade"
+                                   IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}">
+                                <Border Background="#F51C1C1E"
+                                        BorderBrush="#24FFFFFF"
+                                        BorderThickness="1"
+                                        CornerRadius="12"
+                                        Padding="5"
+                                        Margin="10"
+                                        MinWidth="180">
+                                    <Border.Effect>
+                                        <DropShadowEffect BlurRadius="18" ShadowDepth="4" Opacity="0.45" Color="Black"/>
+                                    </Border.Effect>
+                                    <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="Bg" Property="Background" Value="#24FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="HasItems" Value="True">
+                                <Setter TargetName="Arrow" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="IslandMenuSeparator" TargetType="Separator">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Separator">
+                        <Border Height="1" Background="#1FFFFFFF" Margin="10,5"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Grid>
@@ -179,16 +301,93 @@
             </Grid.RenderTransform>
 
             <Grid.ContextMenu>
-                <ContextMenu Opened="IslandMenu_Opened">
-                    <MenuItem x:Name="LyricsTimingMenu" Header="Lyrics timing">
-                        <MenuItem Header="Earlier (half a second)" Click="LyricsEarlier_Click"/>
-                        <MenuItem Header="Later (half a second)" Click="LyricsLater_Click"/>
-                        <MenuItem x:Name="LyricsReset" Header="As found" Click="LyricsReset_Click"/>
+                <ContextMenu Opened="IslandMenu_Opened"
+                             Style="{StaticResource IslandMenu}">
+                    <ContextMenu.Resources>
+                        <Style TargetType="MenuItem" BasedOn="{StaticResource IslandMenuItem}"/>
+                    </ContextMenu.Resources>
+
+                    <!-- What's playing, as a heading -->
+                    <MenuItem x:Name="MenuNowPlaying"
+                              IsHitTestVisible="False"
+                              Focusable="False">
+                        <MenuItem.Icon>
+                            <TextBlock Text="&#xE8D6;" Style="{StaticResource MenuGlyph}" Foreground="#1ED760"/>
+                        </MenuItem.Icon>
+                        <MenuItem.Header>
+                            <StackPanel MaxWidth="220">
+                                <TextBlock x:Name="MenuSongTitle" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock x:Name="MenuSongArtist" Foreground="#99FFFFFF" FontSize="11.5" TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+                        </MenuItem.Header>
                     </MenuItem>
-                    <MenuItem Header="Pick a colour…" Click="PickColor_Click"/>
-                    <MenuItem Header="Settings…" Click="Settings_Click"/>
-                    <Separator/>
-                    <MenuItem Header="Quit Islet" Click="Quit_Click"/>
+                    <MenuItem x:Name="MenuPlayPause" Header="Pause" Click="PlayPause_Click">
+                        <MenuItem.Icon>
+                            <TextBlock x:Name="MenuPlayPauseGlyph" Text="&#xE769;" Style="{StaticResource MenuGlyph}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="MenuNext" Header="Next song" Click="Next_Click">
+                        <MenuItem.Icon>
+                            <TextBlock Text="&#xE893;" Style="{StaticResource MenuGlyph}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="LyricsTimingMenu" Header="Lyrics timing">
+                        <MenuItem.Icon>
+                            <TextBlock Text="&#xE895;" Style="{StaticResource MenuGlyph}"/>
+                        </MenuItem.Icon>
+                        <MenuItem Header="Earlier" InputGestureText="0.5 s" Click="LyricsEarlier_Click">
+                            <MenuItem.Icon>
+                                <TextBlock Text="&#xE892;" Style="{StaticResource MenuGlyph}"/>
+                            </MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="Later" InputGestureText="0.5 s" Click="LyricsLater_Click">
+                            <MenuItem.Icon>
+                                <TextBlock Text="&#xE893;" Style="{StaticResource MenuGlyph}"/>
+                            </MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem x:Name="LyricsReset" Header="As found" Click="LyricsReset_Click">
+                            <MenuItem.Icon>
+                                <TextBlock Text="&#xE777;" Style="{StaticResource MenuGlyph}"/>
+                            </MenuItem.Icon>
+                        </MenuItem>
+                    </MenuItem>
+                    <Separator x:Name="MenuMusicSeparator" Style="{StaticResource IslandMenuSeparator}"/>
+
+                    <!-- Filled in as it opens, by what the timer is doing -->
+                    <MenuItem x:Name="MenuTimer" Header="Timer">
+                        <MenuItem.Icon>
+                            <TextBlock Text="&#xE916;" Style="{StaticResource MenuGlyph}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem Header="Pick a colour" Click="PickColor_Click">
+                        <MenuItem.Icon>
+                            <TextBlock Text="&#xEF3C;" Style="{StaticResource MenuGlyph}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator Style="{StaticResource IslandMenuSeparator}"/>
+
+                    <MenuItem x:Name="MenuEdge" Header="Move to the bottom" Click="MenuEdge_Click">
+                        <MenuItem.Icon>
+                            <TextBlock x:Name="MenuEdgeGlyph" Text="&#xE74B;" Style="{StaticResource MenuGlyph}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="MenuCentre" Header="Move to the centre" Click="MenuCentre_Click">
+                        <MenuItem.Icon>
+                            <TextBlock Text="&#xE8E3;" Style="{StaticResource MenuGlyph}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator Style="{StaticResource IslandMenuSeparator}"/>
+
+                    <MenuItem Header="Settings" Click="Settings_Click">
+                        <MenuItem.Icon>
+                            <TextBlock Text="&#xE713;" Style="{StaticResource MenuGlyph}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem Header="Quit Islet" Click="Quit_Click">
+                        <MenuItem.Icon>
+                            <TextBlock Text="&#xE7E8;" Style="{StaticResource MenuGlyph}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
                 </ContextMenu>
             </Grid.ContextMenu>
 
