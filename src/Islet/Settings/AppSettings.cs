@@ -123,7 +123,6 @@ namespace Islet
         public bool NotifyDiscord { get; set; } = true;
         public bool NotifyWhatsApp { get; set; } = true;
         public bool NotifyMessenger { get; set; } = true;
-        public bool NotifyBrowsers { get; set; }
 
         /// <summary>Notifications drop out of the island; off, a yellow dot beside it says some arrived.</summary>
         public bool ShowNotifications { get; set; } = true;

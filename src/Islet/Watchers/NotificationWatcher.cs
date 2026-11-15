@@ -255,7 +255,8 @@ namespace Islet
                 ChatApp.WhatsApp => settings.NotifyWhatsApp,
                 ChatApp.Messenger => settings.NotifyMessenger,
                 ChatApp.Other => settings.NotifyOtherApps,
-                _ => settings.NotifyBrowsers
+                // The browser's own, and websites': part of "every other app"
+                _ => settings.NotifyOtherApps
             };
         }
     }

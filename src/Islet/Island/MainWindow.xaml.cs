@@ -442,7 +442,7 @@ namespace Islet
             SyncScreenshots();
             ApplyDock();
 
-            if (Settings.NotifyDiscord || Settings.NotifyWhatsApp || Settings.NotifyMessenger || Settings.NotifyBrowsers)
+            if (Settings.NotifyDiscord || Settings.NotifyWhatsApp || Settings.NotifyMessenger || Settings.NotifyOtherApps)
             {
                 if (!notificationsRequested)
                 {

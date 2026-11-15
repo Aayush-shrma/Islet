@@ -373,11 +373,8 @@ namespace Islet
                 v => { Settings.NotifyWhatsApp = v; Settings.Save(); UpdateNotifyStatus(); });
             SwitchRow(messages, "Messenger", null, Settings.NotifyMessenger,
                 v => { Settings.NotifyMessenger = v; Settings.Save(); UpdateNotifyStatus(); });
-            SwitchRow(messages, "Other notifications from your browser",
-                "Windows doesn't say which website a browser tab's notification came from, so these show under the browser's name.",
-                Settings.NotifyBrowsers, v => { Settings.NotifyBrowsers = v; Settings.Save(); UpdateNotifyStatus(); });
             SwitchRow(messages, "Every other app",
-                "Mail, Teams, Outlook, calendars, game launchers, Windows itself: any notification, under its app's name and icon.",
+                "Mail, Teams, calendars, game launchers, your browser and the websites in it, Windows itself: any notification, under its app's name and icon.",
                 Settings.NotifyOtherApps, v => { Settings.NotifyOtherApps = v; Settings.Save(); UpdateNotifyStatus(); });
             SwitchRow(messages, "Show message text", "Off shows only who it's from.", Settings.NotifyShowMessage,
                 v => { Settings.NotifyShowMessage = v; Settings.Save(); });
