@@ -259,6 +259,7 @@ namespace Islet
             };
 
             notifications.Received += EnqueueChat;
+            SetUpQuietDot();
             updateTimer.Tick += async (s, e) => await CheckForUpdatesAsync(announce: true);
             App.SecondInstanceLaunched += () => OpenSettings();
 
@@ -475,6 +476,7 @@ namespace Islet
 
             UpdateSurface();
             ShowPrivacy();
+            ShowQuietDot();
             ShowShelfPill();
             ShowColorPill();
         }
@@ -740,6 +742,7 @@ namespace Islet
                 IslandContainer.IsHitTestVisible = false;
 
             PlacePrivacy();
+            PlaceQuietDot();
             ApplyShelf();
             PlaceColorPill();
         }

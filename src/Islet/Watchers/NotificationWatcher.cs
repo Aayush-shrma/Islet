@@ -11,7 +11,10 @@ namespace Islet
         Discord,
         WhatsApp,
         Messenger,
-        Browser
+        Browser,
+
+        /// <summary>Any other app: Mail, Teams, Outlook, a game launcher, Windows itself.</summary>
+        Other
     }
 
     public sealed record ChatNotification(
@@ -23,8 +26,8 @@ namespace Islet
         bool FromBrowser);
 
     /// <summary>
-    /// Reads Windows toast notifications (with the user's permission) and picks
-    /// out Discord, WhatsApp and Messenger messages. Those apps are recognised
+    /// Reads Windows toast notifications (with the user's permission): Discord, WhatsApp and
+    /// Messenger messages, given their own look, and every other app's too. Those apps are recognised
     /// by name, which includes web apps installed from the browser ("Install
     /// app"). A plain browser tab's notification is recognised by the site
     /// address the browser adds as its last line; other sites are optional and
@@ -35,6 +38,9 @@ namespace Islet
         readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(1200) };
         readonly HashSet<uint> seen = new();
 
+        // Ones that arrived while the island's notifications were off, still in Windows' list
+        readonly HashSet<uint> quiet = new();
+
         UserNotificationListener? listener;
         bool polling;
 
@@ -42,6 +48,11 @@ namespace Islet
             UserNotificationListenerAccessStatus.Unspecified;
 
         public event Action<ChatNotification>? Received;
+
+        /// <summary>How many notifications came while the island's were off and are still unread in Windows.</summary>
+        public event Action<int>? QuietChanged;
+
+        public int QuietCount => quiet.Count;
 
         static readonly string[] Browsers =
             { "chrome", "edge", "brave", "firefox", "opera", "vivaldi" };
@@ -95,8 +106,14 @@ namespace Islet
 
             try
             {
+                var settings = AppSettings.Current;
+
+                // Checked more often when Windows' own pop-ups are being cleared, so they barely show
+                timer.Interval = TimeSpan.FromMilliseconds(settings.ShowNotifications && settings.HideWindowsPopups ? 400 : 1200);
+
                 var current = await listener.GetNotificationsAsync(NotificationKinds.Toast);
                 var ids = new HashSet<uint>();
+                int quietBefore = quiet.Count;
 
                 foreach (var n in current)
                 {
@@ -107,13 +124,42 @@ namespace Islet
 
                     var parsed = await ParseAsync(n);
 
-                    if (parsed != null)
-                        Received?.Invoke(parsed);
+                    if (parsed == null)
+                        continue;
+
+                    if (!settings.ShowNotifications)
+                    {
+                        quiet.Add(n.Id);
+                        continue;
+                    }
+
+                    Received?.Invoke(parsed);
+
+                    // The island has it now; taking it out of Windows closes Windows' pop-up too
+                    if (settings.HideWindowsPopups)
+                    {
+                        try
+                        {
+                            listener.RemoveNotification(n.Id);
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Info("Couldn't clear a notification from Windows: " + ex.Message);
+                        }
+                    }
                 }
 
-                // Forget dismissed notifications so the set doesn't grow forever
+                // Forget dismissed notifications so the set doesn't grow forever; the quiet ones
+                // count only while they're still unread in Windows
                 seen.Clear();
                 seen.UnionWith(ids);
+                quiet.IntersectWith(ids);
+
+                if (settings.ShowNotifications)
+                    quiet.Clear();
+
+                if (quiet.Count != quietBefore)
+                    QuietChanged?.Invoke(quiet.Count);
             }
             catch (Exception ex)
             {
@@ -159,7 +205,7 @@ namespace Islet
                     ChatApp.Discord => "Discord",
                     ChatApp.WhatsApp => "WhatsApp",
                     ChatApp.Messenger => "Messenger",
-                    _ => appName
+                    _ => appName.Length > 0 ? appName : "Windows"
                 },
                 texts[0],
                 string.Join(" ", texts.Skip(1)),
@@ -180,8 +226,9 @@ namespace Islet
             if (name.Contains("whatsapp")) return (ChatApp.WhatsApp, fromBrowser);
             if (name.Contains("messenger")) return (ChatApp.Messenger, fromBrowser);
 
+            // Any other app counts too, if that's wanted
             if (!fromBrowser)
-                return (null, false);
+                return (ChatApp.Other, false);
 
             var site = texts.Count > 1 ? ChatSite.Match(texts[^1]) : Match.Empty;
 
@@ -207,6 +254,7 @@ namespace Islet
                 ChatApp.Discord => settings.NotifyDiscord,
                 ChatApp.WhatsApp => settings.NotifyWhatsApp,
                 ChatApp.Messenger => settings.NotifyMessenger,
+                ChatApp.Other => settings.NotifyOtherApps,
                 _ => settings.NotifyBrowsers
             };
         }

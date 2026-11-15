@@ -99,6 +99,15 @@ namespace Islet
         public bool NotifyWhatsApp { get; set; } = true;
         public bool NotifyMessenger { get; set; } = true;
         public bool NotifyBrowsers { get; set; }
+
+        /// <summary>Notifications drop out of the island; off, a yellow dot beside it says some arrived.</summary>
+        public bool ShowNotifications { get; set; } = true;
+
+        /// <summary>Every other app's notifications too, not only the chat apps'.</summary>
+        public bool NotifyOtherApps { get; set; } = true;
+
+        /// <summary>Clears each notification from Windows once the island has it, so Windows' own pop-up goes.</summary>
+        public bool HideWindowsPopups { get; set; }
         public bool NotifyShowMessage { get; set; } = true;
 
         // Music sources the island follows

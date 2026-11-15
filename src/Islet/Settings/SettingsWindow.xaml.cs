@@ -340,6 +340,14 @@ namespace Islet
             Row(access, "Permission to read notifications", " ", accessButton, null, out notifyStatus);
             UpdateNotifyStatus();
 
+            var islandGroup = Group("On the island");
+            SwitchRow(islandGroup, "Show notifications on the island",
+                "Off, a yellow dot on the island's corner says some arrived; it goes once they're read in Windows, or click it to open them.",
+                Settings.ShowNotifications, v => { Settings.ShowNotifications = v; Settings.Save(); });
+            SwitchRow(islandGroup, "Hide Windows' own pop-ups",
+                "Each notification the island shows is cleared from Windows, which closes its pop-up in the corner. They won't be in Windows' notification centre afterwards.",
+                Settings.HideWindowsPopups, v => { Settings.HideWindowsPopups = v; Settings.Save(); });
+
             var messages = Group("Messages");
             SwitchRow(messages, "Discord", null, Settings.NotifyDiscord,
                 v => { Settings.NotifyDiscord = v; Settings.Save(); UpdateNotifyStatus(); });
@@ -350,6 +358,9 @@ namespace Islet
             SwitchRow(messages, "Other notifications from your browser",
                 "Windows doesn't say which website a browser tab's notification came from, so these show under the browser's name.",
                 Settings.NotifyBrowsers, v => { Settings.NotifyBrowsers = v; Settings.Save(); UpdateNotifyStatus(); });
+            SwitchRow(messages, "Every other app",
+                "Mail, Teams, Outlook, calendars, game launchers, Windows itself: any notification, under its app's name and icon.",
+                Settings.NotifyOtherApps, v => { Settings.NotifyOtherApps = v; Settings.Save(); UpdateNotifyStatus(); });
             SwitchRow(messages, "Show message text", "Off shows only who it's from.", Settings.NotifyShowMessage,
                 v => { Settings.NotifyShowMessage = v; Settings.Save(); });
 

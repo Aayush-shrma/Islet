@@ -220,8 +220,10 @@ public class NotificationClassifyTests
     }
 
     [Fact]
-    public void Other_apps_are_ignored_even_with_a_chat_address()
+    public void Other_apps_are_their_own_even_with_a_chat_address()
     {
-        Assert.Null(NotificationWatcher.Classify("Outlook", new List<string> { "Sam", "discord.com" }).App);
+        // Outlook mentioning discord.com is still Outlook, not a Discord message
+        Assert.Equal(ChatApp.Other, NotificationWatcher.Classify("Outlook", new List<string> { "Sam", "discord.com" }).App);
+        Assert.Equal(ChatApp.Other, NotificationWatcher.Classify("Microsoft Teams", new List<string> { "Meeting in 5 minutes" }).App);
     }
 }

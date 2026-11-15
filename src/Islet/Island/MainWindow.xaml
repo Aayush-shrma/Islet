@@ -1654,6 +1654,19 @@
                      Fill="#FF9F0A"/>
         </Border>
 
+        <!-- Notifications arrived while the island's are off: a yellow dot on its top-right corner -->
+        <Ellipse x:Name="NotifyDot"
+                 HorizontalAlignment="Left"
+                 VerticalAlignment="Top"
+                 Width="10"
+                 Height="10"
+                 Fill="#FFD60A"
+                 Stroke="Black"
+                 StrokeThickness="1.5"
+                 Cursor="Hand"
+                 Visibility="Collapsed"
+                 MouseLeftButtonUp="NotifyDot_Click"/>
+
         <Border x:Name="PrivacyLabel"
                 HorizontalAlignment="Left"
                 VerticalAlignment="Top"
