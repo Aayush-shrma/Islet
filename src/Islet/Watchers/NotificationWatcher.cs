@@ -108,8 +108,8 @@ namespace Islet
             {
                 var settings = AppSettings.Current;
 
-                // Checked more often when Windows' own pop-ups are being cleared, so they barely show
-                timer.Interval = TimeSpan.FromMilliseconds(settings.ShowNotifications && settings.HideWindowsPopups ? 400 : 1200);
+                // Checked much more often when Windows' own pop-ups are being cleared, so they barely show
+                timer.Interval = TimeSpan.FromMilliseconds(settings.ShowNotifications && settings.HideWindowsPopups ? 100 : 1200);
 
                 var current = await listener.GetNotificationsAsync(NotificationKinds.Toast);
                 var ids = new HashSet<uint>();
