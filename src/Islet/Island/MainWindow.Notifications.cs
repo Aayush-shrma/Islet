@@ -26,10 +26,21 @@ namespace Islet
 
         void EnqueueChat(ChatNotification n)
         {
+            // Do Not Disturb is only looked at every couple of seconds; a notification right after it
+            // goes on shouldn't slip through that gap
+            if (Settings.FollowDoNotDisturb)
+                SyncQuiet();
+
             // During a focus session it waits, to arrive with the rest at the end
             if (HoldForFocus(n))
                 return;
 
+            Enqueue(BuildItem(n));
+        }
+
+        // What a notification looks like on the island, and what clicking it does
+        NotifyItem BuildItem(ChatNotification n)
+        {
             var (badge, url, logo) = n.App switch
             {
                 ChatApp.Discord => (Color.FromRgb(88, 101, 242),
@@ -40,7 +51,7 @@ namespace Islet
                 _ => (Color.FromRgb(72, 72, 74), null, null)
             };
 
-            Enqueue(new NotifyItem(
+            return new NotifyItem(
                 n.AppName,
                 n.Sender,
                 Settings.NotifyShowMessage && n.Message.Length > 0 ? n.Message : n.App == ChatApp.Other ? "New notification" : "New message",
@@ -55,7 +66,7 @@ namespace Islet
                     else if (n.App == ChatApp.Other)
                         OpenUrl("ms-actioncenter:");
                 },
-                logo == null ? null : (Geometry)FindResource(logo)));
+                logo == null ? null : (Geometry)FindResource(logo));
         }
 
         // ================= The yellow dot =================

@@ -1,3 +1,4 @@
+using System.Windows;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows.Media;
@@ -11,7 +12,8 @@ namespace Islet
         /// <summary>What has played today and yesterday, for the Listening page in Settings.</summary>
         public ListeningStats Listening => listening;
         DateTime lastCounted = DateTime.Now;
-        AlbumScreensaver? screensaver;
+        NowPlayingTakeover? screensaver;
+        readonly float[] takeoverLevels = new float[AudioVisualizer.BandCount];
 
         // When the day's summary drops out of the island
         const int SummaryHour = 21;
@@ -121,7 +123,7 @@ namespace Islet
             if (privacy.Current.Any)
                 return;
 
-            if (AlbumScreensaver.IdleFor() < TimeSpan.FromMinutes(minutes))
+            if (NowPlayingTakeover.IdleFor() < TimeSpan.FromMinutes(minutes))
                 return;
 
             // Not over a full-screen app, or a video you're watching in the browser in front of you
@@ -132,21 +134,56 @@ namespace Islet
                 string.Equals(ForegroundProcessName(), track.ProcessName, StringComparison.OrdinalIgnoreCase))
                 return;
 
+            ShowTakeover();
+        }
+
+        /// <summary>Starts the Now Playing takeover, whether or not you've been away.</summary>
+        void ShowTakeover(bool byHand = false)
+        {
+            if (screensaver != null || track == null)
+                return;
+
             try
             {
-                screensaver = new AlbumScreensaver(() => track == null
-                    ? null
-                    : new NowPlaying(track, EffectiveArt(track, trackKey) ?? track.Artwork, lyrics));
+                // The island's shape on screen: the takeover grows out of exactly that
+                double w = Math.Max(1, width.Value), h = Math.Max(1, height.Value);
+                var island = new Rect(Left + islandLeft, Top + IslandTopInWindow(h), w, h);
 
-                screensaver.Dismissed += () => screensaver = null;
+                screensaver = new NowPlayingTakeover(
+                    () => track == null
+                        ? null
+                        : new NowPlaying(track, EffectiveArt(track, trackKey) ?? track.Artwork, lyrics),
+                    TakeoverLevel,
+                    island,
+                    byHand ? TimeSpan.FromSeconds(4) : TimeSpan.Zero);
+
+                // The waves follow the real audio, so it's listened to while this is up
+                visualizer.SetActive(Settings.RealAudioVisualizer && Profile.RealAudio && playing);
+
+                screensaver.Dismissed += () =>
+                {
+                    screensaver = null;
+                    SyncVisualizer(surface);
+                };
+
                 screensaver.Show();
-                Log.Info("Album art screensaver started");
+                Log.Info("Now Playing takeover started");
             }
             catch (Exception ex)
             {
-                Log.Error("Starting the screensaver failed", ex);
+                Log.Error("Starting the Now Playing takeover failed", ex);
                 screensaver = null;
             }
+        }
+
+        // How loud the music is, 0 to 1, or -1 when the audio isn't being listened to
+        float TakeoverLevel()
+        {
+            if (!visualizer.IsRunning)
+                return -1;
+
+            visualizer.GetLevels(takeoverLevels);
+            return Math.Clamp(takeoverLevels.Average() * 1.8f, 0, 1);
         }
 
         static string? ForegroundProcessName()

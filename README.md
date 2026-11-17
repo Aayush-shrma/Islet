@@ -33,7 +33,7 @@ irm https://raw.githubusercontent.com/Prathambist/Islet/main/uninstall.ps1 | iex
 - **Synced lyrics:** from [LRCLIB](https://lrclib.net), with a timing nudge per song.
 - **Music videos as songs:** official videos, lyric videos and audio uploads on YouTube show with the song's name and album cover. Previews, feed clips and other videos stay off.
 - **Listening stats:** your top songs, artists and albums over the last five weeks, with covers, play counts, highlights and a recap picture to share. Counted on your PC.
-- **Album art screensaver:** away from the PC while music plays, the island grows into a full-screen cover with lyrics.
+- **Now Playing takeover:** away from the PC while music plays, the island slowly grows to fill the middle of the screen, with the cover, synced lyrics and waves that break on its edge to the beat. Any key or mouse movement shrinks it back; or open it yourself from the right-click menu.
 - **Live visualizer:** bars that move with the music.
 
 **The island**

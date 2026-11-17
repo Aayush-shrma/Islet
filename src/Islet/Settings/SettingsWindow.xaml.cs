@@ -249,8 +249,8 @@ namespace Islet
 
             var away = Group("While you're away");
             int[] screensaverMinutes = { 0, 2, 5, 10 };
-            ChoiceRow(away, "Album art screensaver",
-                "When you're away while music plays, the island grows into a full-screen cover with lyrics. Any key or mouse movement brings you back.",
+            ChoiceRow(away, "Now Playing takeover",
+                "When you're away while music plays, the island slowly grows to fill the middle of the screen, with the cover, the lyrics and waves breaking on its edge to the beat. Any key or mouse movement shrinks it back.",
                 new[] { "Off", "2 min", "5 min", "10 min" },
                 Math.Max(0, Array.IndexOf(screensaverMinutes, Settings.ScreensaverMinutes)),
                 i => { Settings.ScreensaverMinutes = screensaverMinutes[i]; Settings.Save(); });
@@ -381,7 +381,7 @@ namespace Islet
 
             var quiet = Group("Quiet times");
             SwitchRow(quiet, "Hold messages while Windows' Do Not Disturb is on",
-                "Like a focus session: messages wait quietly, then arrive as one summary when Do Not Disturb turns off.",
+                "While it's on, notifications wait behind an orange dot beside the island, and stay in Windows' notification centre. When it turns off, new ones show as usual and the held ones aren't shown again.",
                 Settings.FollowDoNotDisturb, v => { Settings.FollowDoNotDisturb = v; Settings.Save(); });
 
             var onIsland = Group("Also on the island");

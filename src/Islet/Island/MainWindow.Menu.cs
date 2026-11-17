@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 
 namespace Islet
 {
@@ -13,7 +14,7 @@ namespace Islet
         void IslandMenu_Opened(object sender, RoutedEventArgs e)
         {
             bool hasTrack = track != null;
-            var musicItems = new FrameworkElement[] { MenuNowPlaying, MenuPlayPause, MenuNext };
+            var musicItems = new FrameworkElement[] { MenuNowPlaying, MenuPlayPause, MenuNext, MenuTakeover };
 
             foreach (var item in musicItems)
                 item.Visibility = hasTrack ? Visibility.Visible : Visibility.Collapsed;
@@ -36,6 +37,7 @@ namespace Islet
             MenuMusicSeparator.Visibility = hasTrack ? Visibility.Visible : Visibility.Collapsed;
 
             BuildTimerMenu();
+            BuildLookMenus();
 
             bool atTop = Settings.IslandEdge == IslandEdge.Top;
             MenuEdge.Header = atTop ? "Move to the bottom" : "Move to the top";
@@ -92,6 +94,46 @@ namespace Islet
                     break;
             }
         }
+
+        static readonly string[] MusicLookNames = { "Pill with bars", "Circle with bars", "Small pill", "Tiny", "Line" };
+        static readonly string[] IdleLookNames = { "Tiny clock", "Hide", "Clock", "Clock + weather", "Circle" };
+
+        // Both ways the island looks, as lists to pick from, the current one ticked
+        void BuildLookMenus()
+        {
+            FillLooks(MenuMusicView, MusicLookNames, (int)Settings.MusicLook, i =>
+            {
+                Settings.MusicLook = (MusicLook)i;
+                Settings.Save();
+            });
+
+            FillLooks(MenuIdleView, IdleLookNames, (int)Settings.IdleMode, i =>
+            {
+                Settings.IdleMode = (IdleMode)i;
+                Settings.Save();
+                _ = RefreshWeatherAsync();
+            });
+        }
+
+        void FillLooks(MenuItem menu, string[] names, int current, Action<int> pick)
+        {
+            menu.Items.Clear();
+
+            for (int i = 0; i < names.Length; i++)
+            {
+                int index = i;
+                var item = new MenuItem { Header = names[i] };
+
+                if (i == current)
+                    item.Icon = new TextBlock { Text = "", Style = (Style)FindResource("MenuGlyph"), Foreground = new SolidColorBrush(Color.FromRgb(0x1E, 0xD7, 0x60)) };
+
+                item.Click += (s, e) => pick(index);
+                menu.Items.Add(item);
+            }
+        }
+
+        // Dismissed again by any key, mouse movement or click, as when it comes by itself
+        void MenuTakeover_Click(object sender, RoutedEventArgs e) => ShowTakeover(byHand: true);
 
         void MenuEdge_Click(object sender, RoutedEventArgs e)
         {

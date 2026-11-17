@@ -23,7 +23,11 @@ namespace Islet
         string Sender,
         string Message,
         BitmapSource? Icon,
-        bool FromBrowser);
+        bool FromBrowser)
+    {
+        /// <summary>Its place in Windows' list of notifications, to clear it from there later.</summary>
+        public uint? WindowsId { get; init; }
+    }
 
     /// <summary>
     /// Reads Windows toast notifications (with the user's permission): Discord, WhatsApp and
@@ -51,6 +55,25 @@ namespace Islet
 
         /// <summary>How many notifications came while the island's were off and are still unread in Windows.</summary>
         public event Action<int>? QuietChanged;
+
+        /// <summary>
+        /// True while the island is holding notifications back for Do Not Disturb: they're left in
+        /// Windows' notification centre as well, so none is lost if Islet closes meanwhile.
+        /// </summary>
+        public bool KeepInWindows { get; set; }
+
+        /// <summary>Takes a notification out of Windows' list, once the island has really shown it.</summary>
+        public void Remove(uint id)
+        {
+            try
+            {
+                listener?.RemoveNotification(id);
+            }
+            catch (Exception ex)
+            {
+                Log.Info("Couldn't clear a notification from Windows: " + ex.Message);
+            }
+        }
 
         public int QuietCount => quiet.Count;
 
@@ -135,8 +158,9 @@ namespace Islet
 
                     Received?.Invoke(parsed);
 
-                    // The island has it now; taking it out of Windows closes Windows' pop-up too
-                    if (settings.HideWindowsPopups)
+                    // The island has it now; taking it out of Windows closes Windows' pop-up too, unless
+                    // it's only being held for Do Not Disturb (Windows shows no pop-up then anyway)
+                    if (settings.HideWindowsPopups && !KeepInWindows)
                     {
                         try
                         {
@@ -210,7 +234,7 @@ namespace Islet
                 texts[0],
                 string.Join(" ", texts.Skip(1)),
                 icon,
-                fromBrowser);
+                fromBrowser) { WindowsId = n.Id };
         }
 
         /// <summary>

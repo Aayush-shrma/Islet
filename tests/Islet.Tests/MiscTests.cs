@@ -306,3 +306,72 @@ public class DateTextTests
         }
     }
 }
+
+
+public class WavePerimeterTests
+{
+    static readonly System.Windows.Rect Box = new(100, 50, 400, 200);
+    const double Radius = 40;
+
+    [Fact]
+    public void Its_length_is_the_straight_parts_plus_the_corners()
+    {
+        double expected = 2 * (400 - 80) + 2 * (200 - 80) + 2 * Math.PI * 40;
+        Assert.Equal(expected, WavePerimeter.Length(Box, Radius), 6);
+    }
+
+    [Fact]
+    public void It_starts_on_the_top_edge_facing_up_and_comes_back_round()
+    {
+        var (start, normal) = WavePerimeter.At(Box, Radius, 0);
+        Assert.Equal(new System.Windows.Point(140, 50), start);
+        Assert.Equal(new System.Windows.Vector(0, -1), normal);
+
+        var (again, _) = WavePerimeter.At(Box, Radius, WavePerimeter.Length(Box, Radius));
+        Assert.Equal(start.X, again.X, 6);
+        Assert.Equal(start.Y, again.Y, 6);
+    }
+
+    [Fact]
+    public void Every_point_is_on_the_outline_and_every_normal_points_outward_and_has_length_one()
+    {
+        double length = WavePerimeter.Length(Box, Radius);
+        var centre = new System.Windows.Point(300, 150);
+
+        for (int i = 0; i < 400; i++)
+        {
+            var (point, normal) = WavePerimeter.At(Box, Radius, length * i / 400);
+
+            Assert.Equal(1, normal.Length, 6);
+            Assert.True(point.X >= 100 - 1e-6 && point.X <= 500 + 1e-6 && point.Y >= 50 - 1e-6 && point.Y <= 250 + 1e-6);
+
+            // Pushed a little way along its normal, it's further from the middle
+            var pushed = point + normal * 5;
+            Assert.True((pushed - centre).Length > (point - centre).Length, $"sample {i}");
+        }
+    }
+
+    [Fact]
+    public void Neighbouring_points_are_never_far_apart()
+    {
+        double length = WavePerimeter.Length(Box, Radius);
+        int samples = 600;
+        var last = WavePerimeter.At(Box, Radius, 0).Point;
+
+        for (int i = 1; i <= samples; i++)
+        {
+            var next = WavePerimeter.At(Box, Radius, length * i / samples).Point;
+            Assert.True((next - last).Length < length / samples * 1.05, $"jump at {i}");
+            last = next;
+        }
+    }
+
+    [Fact]
+    public void A_corner_radius_larger_than_the_shape_is_held_to_what_fits()
+    {
+        var small = new System.Windows.Rect(0, 0, 40, 20);
+        double length = WavePerimeter.Length(small, 500);
+
+        Assert.Equal(2 * Math.PI * 10 + 2 * (40 - 20), length, 6);
+    }
+}

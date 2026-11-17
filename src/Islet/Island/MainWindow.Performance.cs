@@ -47,7 +47,7 @@ namespace Islet
         void SyncVisualizer(Surface shown)
         {
             bool barsShown = shown is Surface.CompactMusic or Surface.SmallMusic or Surface.ExpandedMusic or Surface.Peek;
-            visualizer.SetActive(Settings.RealAudioVisualizer && Profile.RealAudio && playing && barsShown);
+            visualizer.SetActive(Settings.RealAudioVisualizer && Profile.RealAudio && playing && (barsShown || screensaver != null));
         }
 
         bool ApplyStillBars()

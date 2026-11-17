@@ -183,7 +183,7 @@ namespace Islet
         public bool FindFileLocks { get; set; } = true;
         public bool DailyMusicSummary { get; set; } = true;
 
-        /// <summary>Minutes away before the album art screensaver; 0 turns it off.</summary>
+        /// <summary>Minutes away before the Now Playing takeover (the old album art screensaver); 0 turns it off.</summary>
         public int ScreensaverMinutes { get; set; } = 5;
 
         // Spotify Web API

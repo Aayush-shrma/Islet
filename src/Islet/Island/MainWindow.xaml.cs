@@ -494,6 +494,7 @@ namespace Islet
             UpdateSurface();
             ShowPrivacy();
             ShowQuietDot();
+            ShowHeldDot();
             ShowShelfPill();
             ShowColorPill();
         }

@@ -331,6 +331,11 @@
                             <TextBlock Text="&#xE893;" Style="{StaticResource MenuGlyph}"/>
                         </MenuItem.Icon>
                     </MenuItem>
+                    <MenuItem x:Name="MenuTakeover" Header="Now Playing, full screen" Click="MenuTakeover_Click">
+                        <MenuItem.Icon>
+                            <TextBlock Text="&#xE740;" Style="{StaticResource MenuGlyph}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
                     <MenuItem x:Name="LyricsTimingMenu" Header="Lyrics timing">
                         <MenuItem.Icon>
                             <TextBlock Text="&#xE895;" Style="{StaticResource MenuGlyph}"/>
@@ -362,6 +367,19 @@
                     <MenuItem Header="Pick a colour" Click="PickColor_Click">
                         <MenuItem.Icon>
                             <TextBlock Text="&#xEF3C;" Style="{StaticResource MenuGlyph}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator Style="{StaticResource IslandMenuSeparator}"/>
+
+                    <!-- How the island looks, a pick away: filled in as the menu opens, the current one ticked -->
+                    <MenuItem x:Name="MenuMusicView" Header="While music plays">
+                        <MenuItem.Icon>
+                            <TextBlock Text="&#xE8D6;" Style="{StaticResource MenuGlyph}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="MenuIdleView" Header="When idle">
+                        <MenuItem.Icon>
+                            <TextBlock Text="&#xE121;" Style="{StaticResource MenuGlyph}"/>
                         </MenuItem.Icon>
                     </MenuItem>
                     <Separator Style="{StaticResource IslandMenuSeparator}"/>
@@ -1836,16 +1854,16 @@
         <Border x:Name="ColorPill"
                 HorizontalAlignment="Left"
                 VerticalAlignment="Top"
-                Height="22"
-                CornerRadius="11"
-                Background="Black"
-                Padding="6,0"
+                Height="12"
+                Background="Transparent"
+                Padding="0"
                 Cursor="Hand"
                 Visibility="Collapsed"
                 ToolTip="Colours you picked"
                 MouseLeftButtonUp="ColorPill_Click">
             <StackPanel x:Name="ColorPillDots"
                         Orientation="Horizontal"
+                        HorizontalAlignment="Left"
                         VerticalAlignment="Center"/>
         </Border>
 
@@ -1884,6 +1902,26 @@
                  Cursor="Hand"
                  Visibility="Collapsed"
                  MouseLeftButtonUp="NotifyDot_Click"/>
+
+        <!-- Notifications held back for Do Not Disturb or a focus session: an orange dot beside the island,
+             above the colour picker's dots; clicking it lists them -->
+        <Border x:Name="HeldPill"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Top"
+                Width="14"
+                Height="12"
+                Background="Transparent"
+                Cursor="Hand"
+                Visibility="Collapsed"
+                MouseLeftButtonUp="HeldDot_Click">
+            <Ellipse x:Name="HeldDot"
+                     Width="8"
+                     Height="8"
+                     HorizontalAlignment="Left"
+                     Fill="#FF9500"
+                     Stroke="Black"
+                     StrokeThickness="1"/>
+        </Border>
 
         <Border x:Name="PrivacyLabel"
                 HorizontalAlignment="Left"
