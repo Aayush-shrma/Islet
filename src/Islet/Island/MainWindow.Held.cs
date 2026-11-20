@@ -27,7 +27,7 @@ namespace Islet
         void ShowHeldDot()
         {
             int count = heldForFocus.Count;
-            bool hiddenForApp = fullscreen.ProcessName != null && Settings.ShouldHideFor(fullscreen.ProcessName);
+            bool hiddenForApp = IslandHiddenForApp();
             bool show = count > 0 && !hiddenForApp && islandOpacity.Value > 0.5;
 
             HeldPill.Visibility = show ? Visibility.Visible : Visibility.Collapsed;

@@ -83,7 +83,7 @@ namespace Islet
         void ShowQuietDot()
         {
             int count = notifications.QuietCount;
-            bool hiddenForApp = fullscreen.ProcessName != null && Settings.ShouldHideFor(fullscreen.ProcessName);
+            bool hiddenForApp = IslandHiddenForApp();
             bool show = !Settings.ShowNotifications && count > 0 && !hiddenForApp && islandOpacity.Value > 0.5;
 
             NotifyDot.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
@@ -119,7 +119,8 @@ namespace Islet
 
             notifyQueue.Enqueue(item);
 
-            if (currentNotify == null)
+            // Kept for when you're back, rather than shown on an island nobody can see
+            if (currentNotify == null && screensaver == null)
                 ShowNextNotification();
         }
 

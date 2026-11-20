@@ -317,7 +317,7 @@ namespace Islet
 
         void ShowColorPill()
         {
-            bool hiddenForApp = fullscreen.ProcessName != null && Settings.ShouldHideFor(fullscreen.ProcessName);
+            bool hiddenForApp = IslandHiddenForApp();
             bool show = PaletteOn && palette.Colors.Count > 0 && surface != Surface.Palette && !hiddenForApp;
 
             ColorPill.Visibility = show ? Visibility.Visible : Visibility.Collapsed;

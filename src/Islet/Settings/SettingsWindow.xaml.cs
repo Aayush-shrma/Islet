@@ -248,10 +248,12 @@ namespace Islet
                 i => { Settings.ScrollTarget = (ScrollTarget)i; Settings.Save(); });
 
             var away = Group("While you're away");
-            int[] screensaverMinutes = { 0, 2, 5, 10 };
-            ChoiceRow(away, "Now Playing takeover",
-                "When you're away while music plays, the island slowly grows to fill the middle of the screen, with the cover, the lyrics and waves breaking on its edge to the beat. Any key or mouse movement shrinks it back.",
-                new[] { "Off", "2 min", "5 min", "10 min" },
+            int[] screensaverMinutes = { 2, 5, 10 };
+            SwitchRow(away, "Screensaver",
+                "When you're away while music plays, the cover and the song's lyrics fill the screen. Not during calls, videos or games. Any key or mouse movement brings you back.",
+                Settings.ScreensaverEnabled, v => { Settings.ScreensaverEnabled = v; Settings.Save(); });
+            ChoiceRow(away, "Starts after", null,
+                new[] { "2 min", "5 min", "10 min" },
                 Math.Max(0, Array.IndexOf(screensaverMinutes, Settings.ScreensaverMinutes)),
                 i => { Settings.ScreensaverMinutes = screensaverMinutes[i]; Settings.Save(); });
 

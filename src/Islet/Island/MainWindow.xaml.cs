@@ -188,6 +188,15 @@ namespace Islet
             SetUpLocks();
             SetUpListening();
 
+            // A pop-up the island will take over is kept out of sight from the moment it appears
+            winEvents = new WinEventWatcher(OnTaskbarMoved, () =>
+            {
+                notifications.PollNow(fromEvent: true);
+                return notifications.Running && Settings.ShowNotifications && Settings.HideWindowsPopups && !notifications.KeepInWindows;
+            });
+            notifications.PopupNotTaken += winEvents.RevealToast;
+            Closed += (s, e) => winEvents.Dispose();
+
             systemStatus.VolumeChanged += (level, muted) => Dispatcher.BeginInvoke(() =>
             {
                 if (Settings.ShowSystemStatus)
@@ -456,6 +465,8 @@ namespace Islet
                 notificationsRequested = false;
             }
 
+            SyncWinEvents();
+
             if (Settings.AutoUpdate) updateTimer.Start(); else updateTimer.Stop();
 
             // Switching video cover art on/off applies to the current song right away
@@ -480,6 +491,21 @@ namespace Islet
             QueueTrackUpdate();
         }
 
+        // Out of the way of a game or film that asks for it, and of the screensaver
+        bool IslandHiddenForApp() =>
+            screensaver != null || (fullscreen.ProcessName != null && Settings.ShouldHideFor(fullscreen.ProcessName));
+
+        // The island and its little pills, shown or hidden again after that changes
+        void SyncHiddenForApp()
+        {
+            UpdateSurface();
+            ShowPrivacy();
+            ShowQuietDot();
+            ShowHeldDot();
+            ShowShelfPill();
+            ShowColorPill();
+        }
+
         void OnFullscreenChanged()
         {
             if (fullscreen.ProcessName != null)
@@ -491,12 +517,7 @@ namespace Islet
                 : $"Full-screen app in front: {fullscreen.ProcessName}" +
                   (Settings.ShouldHideFor(fullscreen.ProcessName) ? ", hiding the island" : ", island stays"));
 
-            UpdateSurface();
-            ShowPrivacy();
-            ShowQuietDot();
-            ShowHeldDot();
-            ShowShelfPill();
-            ShowColorPill();
+            SyncHiddenForApp();
         }
 
         // ================= State → shape =================
@@ -509,7 +530,7 @@ namespace Islet
 
             return IslandState.Choose(new IslandInputs
             {
-                HiddenForApp = fullscreen.ProcessName != null && Settings.ShouldHideFor(fullscreen.ProcessName),
+                HiddenForApp = IslandHiddenForApp(),
                 TimerActive = TimerActive,
                 TimerRinging = TimerRinging,
                 ShelfWanted = ShelfWanted,
@@ -531,7 +552,7 @@ namespace Islet
             var next = ChooseSurface();
 
             // When the island can't appear, Windows keeps its own pop-up
-            bool hiddenForApp = fullscreen.ProcessName != null && Settings.ShouldHideFor(fullscreen.ProcessName);
+            bool hiddenForApp = IslandHiddenForApp();
             volumeKeys.Active = Settings.ShowSystemStatus && Settings.ReplaceVolumePopup && !hiddenForApp;
             SyncVisualizer(next);
 
@@ -1792,7 +1813,7 @@ namespace Islet
         // while it keeps the flag, so the island ends up behind apps. Put it back on top.
         void KeepOnTop()
         {
-            if (fullscreen.ProcessName != null && Settings.ShouldHideFor(fullscreen.ProcessName))
+            if (IslandHiddenForApp())
                 return;
 
             var hwnd = new WindowInteropHelper(this).Handle;

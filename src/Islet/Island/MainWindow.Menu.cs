@@ -14,7 +14,7 @@ namespace Islet
         void IslandMenu_Opened(object sender, RoutedEventArgs e)
         {
             bool hasTrack = track != null;
-            var musicItems = new FrameworkElement[] { MenuNowPlaying, MenuPlayPause, MenuNext, MenuTakeover };
+            var musicItems = new FrameworkElement[] { MenuNowPlaying, MenuPlayPause, MenuNext, MenuScreensaver };
 
             foreach (var item in musicItems)
                 item.Visibility = hasTrack ? Visibility.Visible : Visibility.Collapsed;
@@ -132,8 +132,8 @@ namespace Islet
             }
         }
 
-        // Dismissed again by any key, mouse movement or click, as when it comes by itself
-        void MenuTakeover_Click(object sender, RoutedEventArgs e) => ShowTakeover(byHand: true);
+        // Dismissed again by any key, mouse movement or click (after a moment), as when it comes by itself
+        void MenuScreensaver_Click(object sender, RoutedEventArgs e) => ShowScreensaver(byHand: true);
 
         void MenuEdge_Click(object sender, RoutedEventArgs e)
         {

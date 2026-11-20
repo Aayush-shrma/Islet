@@ -12,8 +12,7 @@ namespace Islet
         /// <summary>What has played today and yesterday, for the Listening page in Settings.</summary>
         public ListeningStats Listening => listening;
         DateTime lastCounted = DateTime.Now;
-        NowPlayingTakeover? screensaver;
-        readonly float[] takeoverLevels = new float[AudioVisualizer.BandCount];
+        AlbumScreensaver? screensaver;
 
         // When the day's summary drops out of the island
         const int SummaryHour = 21;
@@ -114,76 +113,74 @@ namespace Islet
 
         void StartScreensaverIfAway()
         {
-            int minutes = Settings.ScreensaverMinutes;
-
-            if (minutes <= 0 || screensaver != null || track == null || !playing)
+            if (!Settings.ScreensaverEnabled || screensaver != null || track == null || !playing)
                 return;
 
-            // Sitting still on a call isn't being away
-            if (privacy.Current.Any)
+            if (AlbumScreensaver.IdleFor() < TimeSpan.FromMinutes(Math.Max(1, Settings.ScreensaverMinutes)))
                 return;
 
-            if (NowPlayingTakeover.IdleFor() < TimeSpan.FromMinutes(minutes))
+            if (!ScreensaverMayShow())
                 return;
 
-            // Not over a full-screen app, or a video you're watching in the browser in front of you
-            if (fullscreen.ProcessName != null)
-                return;
-
+            // Not over a video you're watching in the browser in front of you
             if (track.Source == MediaSource.Browser &&
                 string.Equals(ForegroundProcessName(), track.ProcessName, StringComparison.OrdinalIgnoreCase))
                 return;
 
-            ShowTakeover();
+            ShowScreensaver();
         }
 
-        /// <summary>Starts the Now Playing takeover, whether or not you've been away.</summary>
-        void ShowTakeover(bool byHand = false)
+        // Sitting still on a call, or watching a video or a game, isn't being away
+        bool ScreensaverMayShow()
+        {
+            if (privacy.Current.Any)
+                return false;
+
+            if (fullscreen.ProcessName != null)
+                return false;
+
+            // Video players, browsers showing a video and call apps all ask for the screen to be kept on
+            return !DisplayRequest.IsHeld();
+        }
+
+        /// <summary>Starts the screensaver, whether or not you've been away.</summary>
+        void ShowScreensaver(bool byHand = false)
         {
             if (screensaver != null || track == null)
                 return;
 
             try
             {
-                // The island's shape on screen: the takeover grows out of exactly that
+                // The island's shape on screen: the screensaver grows out of it
                 double w = Math.Max(1, width.Value), h = Math.Max(1, height.Value);
                 var island = new Rect(Left + islandLeft, Top + IslandTopInWindow(h), w, h);
 
-                screensaver = new NowPlayingTakeover(
-                    () => track == null
+                screensaver = new AlbumScreensaver(
+                    () => track == null || privacy.Current.Any || fullscreen.ProcessName != null
                         ? null
                         : new NowPlaying(track, EffectiveArt(track, trackKey) ?? track.Artwork, lyrics),
-                    TakeoverLevel,
                     island,
-                    byHand ? TimeSpan.FromSeconds(4) : TimeSpan.Zero);
+                    byHand ? TimeSpan.FromSeconds(3) : TimeSpan.Zero);
 
-                // The waves follow the real audio, so it's listened to while this is up
-                visualizer.SetActive(Settings.RealAudioVisualizer && Profile.RealAudio && playing);
-
-                screensaver.Dismissed += () =>
+                // The island stays out of sight until it has gone, then shows what came in meanwhile
+                screensaver.Closed += (s, e) =>
                 {
                     screensaver = null;
-                    SyncVisualizer(surface);
+                    SyncHiddenForApp();
+
+                    if (currentNotify == null && notifyQueue.Count > 0)
+                        ShowNextNotification();
                 };
 
                 screensaver.Show();
-                Log.Info("Now Playing takeover started");
+                SyncHiddenForApp();
+                Log.Info(byHand ? "Screensaver opened from the menu" : "Screensaver started");
             }
             catch (Exception ex)
             {
-                Log.Error("Starting the Now Playing takeover failed", ex);
+                Log.Error("Starting the screensaver failed", ex);
                 screensaver = null;
             }
-        }
-
-        // How loud the music is, 0 to 1, or -1 when the audio isn't being listened to
-        float TakeoverLevel()
-        {
-            if (!visualizer.IsRunning)
-                return -1;
-
-            visualizer.GetLevels(takeoverLevels);
-            return Math.Clamp(takeoverLevels.Average() * 1.8f, 0, 1);
         }
 
         static string? ForegroundProcessName()

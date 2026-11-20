@@ -331,7 +331,7 @@
                             <TextBlock Text="&#xE893;" Style="{StaticResource MenuGlyph}"/>
                         </MenuItem.Icon>
                     </MenuItem>
-                    <MenuItem x:Name="MenuTakeover" Header="Now Playing, full screen" Click="MenuTakeover_Click">
+                    <MenuItem x:Name="MenuScreensaver" Header="Screensaver now" Click="MenuScreensaver_Click">
                         <MenuItem.Icon>
                             <TextBlock Text="&#xE740;" Style="{StaticResource MenuGlyph}"/>
                         </MenuItem.Icon>

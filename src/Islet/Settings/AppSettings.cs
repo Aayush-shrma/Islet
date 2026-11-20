@@ -183,7 +183,10 @@ namespace Islet
         public bool FindFileLocks { get; set; } = true;
         public bool DailyMusicSummary { get; set; } = true;
 
-        /// <summary>Minutes away before the Now Playing takeover (the old album art screensaver); 0 turns it off.</summary>
+        /// <summary>While you're away and music plays, the cover and lyrics fill the screen.</summary>
+        public bool ScreensaverEnabled { get; set; } = true;
+
+        /// <summary>Minutes away before the screensaver comes.</summary>
         public int ScreensaverMinutes { get; set; } = 5;
 
         // Spotify Web API
@@ -217,8 +220,18 @@ namespace Islet
             try
             {
                 if (File.Exists(FilePath))
-                    return JsonSerializer.Deserialize<AppSettings>(
-                        File.ReadAllText(FilePath), options) ?? new AppSettings();
+                {
+                    var loaded = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(FilePath), options) ?? new AppSettings();
+
+                    // Once 0 minutes meant off; now that's its own switch
+                    if (loaded.ScreensaverMinutes <= 0)
+                    {
+                        loaded.ScreensaverEnabled = false;
+                        loaded.ScreensaverMinutes = 5;
+                    }
+
+                    return loaded;
+                }
             }
             catch
             {

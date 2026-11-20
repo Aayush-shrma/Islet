@@ -617,7 +617,7 @@ namespace Islet
 
         void ShowShelfPill()
         {
-            bool hiddenForApp = fullscreen.ProcessName != null && Settings.ShouldHideFor(fullscreen.ProcessName);
+            bool hiddenForApp = IslandHiddenForApp();
             bool show = ShelfOn && shelf.Items.Count > 0 && surface != Surface.Shelf && !hiddenForApp;
 
             ShelfPill.Visibility = show ? Visibility.Visible : Visibility.Collapsed;

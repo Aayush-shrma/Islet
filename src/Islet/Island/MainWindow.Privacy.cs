@@ -22,7 +22,7 @@ namespace Islet
         void SyncPrivacy()
         {
             // The screensaver needs to know too, to stay away during a call
-            if (Settings.ShowPrivacyDots || Settings.ScreensaverMinutes > 0)
+            if (Settings.ShowPrivacyDots || Settings.ScreensaverEnabled)
                 privacy.Start();
             else
                 privacy.Stop();
@@ -33,7 +33,7 @@ namespace Islet
         void ShowPrivacy()
         {
             var use = privacy.Current;
-            bool hiddenForApp = fullscreen.ProcessName != null && Settings.ShouldHideFor(fullscreen.ProcessName);
+            bool hiddenForApp = IslandHiddenForApp();
             bool show = Settings.ShowPrivacyDots && use.Any && !hiddenForApp;
 
             PrivacyPill.Visibility = show ? Visibility.Visible : Visibility.Collapsed;

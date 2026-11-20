@@ -70,9 +70,49 @@ namespace Islet
         double WindowTopFor(IslandEdge edge) =>
             edge == IslandEdge.Bottom ? Math.Max(0, BottomEdge() - Height) : 0;
 
-        // Checks where the taskbar is, a few times a second, while the island sits at the bottom
-        readonly DispatcherTimer taskbarTimer = new() { Interval = TimeSpan.FromMilliseconds(60) };
+        // Windows says when the taskbar moves (see WinEventWatcher), so nothing looks at it meanwhile.
+        // This slow check is only a safety net, for Explorer restarting and the like.
+        readonly DispatcherTimer taskbarTimer = new() { Interval = TimeSpan.FromSeconds(2) };
         double lastBottomEdge = double.NaN;
+        WinEventWatcher winEvents = null!;
+
+        // The taskbar has moved: the island goes to just above it, or back to the edge once it's gone
+        void OnTaskbarMoved()
+        {
+            if (dragging || Settings.IslandEdge != IslandEdge.Bottom)
+                return;
+
+            double edge = BottomEdge();
+
+            if (double.IsNaN(lastBottomEdge) || Math.Abs(edge - lastBottomEdge) > 1)
+            {
+                lastBottomEdge = edge;
+
+                // Quick enough to keep pace with the taskbar's own slide
+                dockY.Configure(0.22, 0.9);
+                dockY.Target = WindowTopFor(IslandEdge.Bottom);
+                EnsureRendering();
+            }
+        }
+
+        // Listens for the taskbar sliding (at the bottom edge) and for notification pop-ups
+        // (while they're being cleared), and for nothing otherwise
+        void SyncWinEvents()
+        {
+            bool taskbar = Settings.IslandEdge == IslandEdge.Bottom;
+            bool toasts = notificationsRequested && Settings.ShowNotifications && Settings.HideWindowsPopups;
+
+            if (!taskbar && !toasts)
+            {
+                winEvents.Stop();
+                return;
+            }
+
+            if (!winEvents.Start(taskbar, toasts))
+                Log.Info("Windows didn't take up the event listening; the slower checks do the job");
+
+            notifications.EventsAvailable = toasts && winEvents.Listening;
+        }
 
         /// <summary>
         /// Where the bottom of the usable screen is right now: just above the taskbar while it's
@@ -168,19 +208,11 @@ namespace Islet
             // A taskbar sliding up, or back down, moves the island with it
             taskbarTimer.Tick += (s, e) =>
             {
-                if (dragging)
-                    return;
+                // Explorer restarting gives a new taskbar window, which the listening has to be pointed at again
+                if (!winEvents.TaskbarStillWatched)
+                    SyncWinEvents();
 
-                double edge = BottomEdge();
-
-                if (double.IsNaN(lastBottomEdge) || Math.Abs(edge - lastBottomEdge) > 1)
-                {
-                    lastBottomEdge = edge;
-                    // Quick enough to keep pace with the taskbar's own slide
-                    dockY.Configure(0.22, 0.9);
-                    dockY.Target = WindowTopFor(IslandEdge.Bottom);
-                    EnsureRendering();
-                }
+                OnTaskbarMoved();
             };
 
             holdTimer.Tick += (s, e) =>

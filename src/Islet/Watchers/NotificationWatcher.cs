@@ -57,6 +57,50 @@ namespace Islet
         public event Action<int>? QuietChanged;
 
         /// <summary>
+        /// Windows' own announcement of a pop-up appearing is being heard (see WinEventWatcher). Then
+        /// the notification list is looked at the moment one does, and only slowly otherwise. Until
+        /// that has been seen to work, it's looked at quickly all the time, as a precaution.
+        /// </summary>
+        public bool EventsAvailable { get; set; }
+
+        bool eventsProven;
+        bool pollFromEvent;
+        bool takenSinceEvent;
+
+        /// <summary>True while notifications are being looked at.</summary>
+        public bool Running => listener != null && timer.IsEnabled;
+
+        /// <summary>A pop-up appeared, but no notification the island took over came with it.</summary>
+        public event Action? PopupNotTaken;
+        bool pollAgain;
+        DateTime burstUntil = DateTime.MinValue;
+
+        /// <summary>Looks at the notification list now, and keeps looking closely for a moment, as a pop-up appeared.</summary>
+        public void PollNow(bool fromEvent)
+        {
+            if (listener == null || !timer.IsEnabled)
+                return;
+
+            if (fromEvent)
+            {
+                if (!pollFromEvent)
+                    takenSinceEvent = false;
+
+                pollFromEvent = true;
+                burstUntil = DateTime.UtcNow.AddMilliseconds(1500);
+                timer.Interval = TimeSpan.FromMilliseconds(40);
+            }
+
+            if (polling)
+            {
+                pollAgain = true;
+                return;
+            }
+
+            _ = PollAsync();
+        }
+
+        /// <summary>
         /// True while the island is holding notifications back for Do Not Disturb: they're left in
         /// Windows' notification centre as well, so none is lost if Islet closes meanwhile.
         /// </summary>
@@ -131,8 +175,13 @@ namespace Islet
             {
                 var settings = AppSettings.Current;
 
-                // Checked much more often when Windows' own pop-ups are being cleared, so they barely show
-                timer.Interval = TimeSpan.FromMilliseconds(settings.ShowNotifications && settings.HideWindowsPopups ? 100 : 1200);
+                // While Windows' own pop-ups are being cleared they have to be caught at once: by the
+                // announcement of the pop-up where that's heard and proven, else by looking often
+                bool clearing = settings.ShowNotifications && settings.HideWindowsPopups;
+                bool burst = DateTime.UtcNow < burstUntil;
+                bool fast = clearing && !(EventsAvailable && eventsProven);
+
+                timer.Interval = TimeSpan.FromMilliseconds(burst ? 40 : fast ? 100 : 1200);
 
                 var current = await listener.GetNotificationsAsync(NotificationKinds.Toast);
                 var ids = new HashSet<uint>();
@@ -150,6 +199,13 @@ namespace Islet
                     if (parsed == null)
                         continue;
 
+                    // A notification found just after a pop-up announced itself: that announcement works
+                    if (pollFromEvent && !eventsProven)
+                    {
+                        eventsProven = true;
+                        Log.Info("Notification pop-ups are heard as they appear; the fast checking is no longer needed");
+                    }
+
                     if (!settings.ShowNotifications)
                     {
                         quiet.Add(n.Id);
@@ -157,6 +213,7 @@ namespace Islet
                     }
 
                     Received?.Invoke(parsed);
+                    takenSinceEvent = true;
 
                     // The island has it now; taking it out of Windows closes Windows' pop-up too, unless
                     // it's only being held for Do Not Disturb (Windows shows no pop-up then anyway)
@@ -192,6 +249,20 @@ namespace Islet
             finally
             {
                 polling = false;
+
+                // An announcement came in during the look: look again straight away
+                if (pollAgain)
+                {
+                    pollAgain = false;
+                    _ = PollAsync();
+                }
+                else if (pollFromEvent && DateTime.UtcNow >= burstUntil)
+                {
+                    pollFromEvent = false;
+
+                    if (!takenSinceEvent)
+                        PopupNotTaken?.Invoke();
+                }
             }
         }
 
