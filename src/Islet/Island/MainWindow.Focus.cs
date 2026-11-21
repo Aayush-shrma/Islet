@@ -53,6 +53,8 @@ namespace Islet
                 return false;
 
             heldForFocus.Add(message);
+            Log.Info($"Holding a notification from {message.AppName} while quiet ({heldForFocus.Count} held)");
+            ShowHeldDot();
 
             if (heldForFocus.Count > MostHeld)
                 heldForFocus.RemoveAt(0);
@@ -85,6 +87,7 @@ namespace Islet
                 return;
 
             windowsQuiet = quiet;
+            notifications.KeepInWindows = quiet;
             Log.Info($"Windows Do Not Disturb {(quiet ? "on" : "off")}");
             SyncHolding(QuietReason.DoNotDisturb);
         }
@@ -124,9 +127,21 @@ namespace Islet
             if (holding)
             {
                 heldForFocus.Clear();
+                ShowHeldDot();
                 return;
             }
 
+            // Do Not Disturb is just held: while it's on, what came in waits behind the orange dot, and
+            // stays in Windows' notification centre. Nothing is shown again when it turns off.
+            if (changed == QuietReason.DoNotDisturb)
+            {
+                Log.Info($"Do Not Disturb over: {heldForFocus.Count} left in Windows' notification centre, not shown again");
+                heldForFocus.Clear();
+                ShowHeldDot();
+                return;
+            }
+
+            // A focus session you set yourself ends with one card for what waited
             ShowFocusSummary(changed);
         }
 
@@ -138,6 +153,8 @@ namespace Islet
 
             var held = heldForFocus.ToList();
             heldForFocus.Clear();
+            ShowHeldDot();
+            Log.Info($"Quiet spell over: {held.Count} held");
 
             var (title, detail) = FocusSummary.Describe(held.Select(m => m.AppName).ToList(), reason);
 
@@ -155,7 +172,13 @@ namespace Islet
                 () =>
                 {
                     foreach (var message in held)
+                    {
                         EnqueueChat(message);
+
+                        // Shown at last, so it can leave Windows' list too
+                        if (Settings.HideWindowsPopups && message.WindowsId is uint id)
+                            notifications.Remove(id);
+                    }
                 }));
         }
     }

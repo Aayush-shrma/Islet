@@ -1,3 +1,4 @@
+using System.Windows;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows.Media;
@@ -40,7 +41,7 @@ namespace Islet
                 listening.Add(now, track.Artist, track.Title, TimeSpan.FromSeconds(gap), track.Album, EffectiveArt(track, trackKey),
                     track.Site ?? track.SourceName, track.PositionAt(DateTimeOffset.Now));
 
-            AmbientCaption.Text = (Settings.DailyMusicSummary ? ListeningStats.Describe(listening.For(now)) : null)
+            AmbientCaption.Text = (Settings.DailyMusicSummary ? ListeningStats.DescribeShort(listening.For(now)) : null)
                 ?? "Nothing playing";
 
             ShowEveningSummary(now);
@@ -112,31 +113,68 @@ namespace Islet
 
         void StartScreensaverIfAway()
         {
-            int minutes = Settings.ScreensaverMinutes;
-
-            if (minutes <= 0 || screensaver != null || track == null || !playing)
+            if (!Settings.ScreensaverEnabled || screensaver != null || track == null || !playing)
                 return;
 
-            if (AlbumScreensaver.IdleFor() < TimeSpan.FromMinutes(minutes))
+            if (AlbumScreensaver.IdleFor() < TimeSpan.FromMinutes(Math.Max(1, Settings.ScreensaverMinutes)))
                 return;
 
-            // Not over a full-screen app, or a video you're watching in the browser in front of you
-            if (fullscreen.ProcessName != null)
+            if (!ScreensaverMayShow())
                 return;
 
+            // Not over a video you're watching in the browser in front of you
             if (track.Source == MediaSource.Browser &&
                 string.Equals(ForegroundProcessName(), track.ProcessName, StringComparison.OrdinalIgnoreCase))
                 return;
 
+            ShowScreensaver();
+        }
+
+        // Sitting still on a call, or watching a video or a game, isn't being away
+        bool ScreensaverMayShow()
+        {
+            if (privacy.Current.Any)
+                return false;
+
+            if (fullscreen.ProcessName != null)
+                return false;
+
+            // Video players, browsers showing a video and call apps all ask for the screen to be kept on
+            return !DisplayRequest.IsHeld();
+        }
+
+        /// <summary>Starts the screensaver, whether or not you've been away.</summary>
+        void ShowScreensaver(bool byHand = false)
+        {
+            if (screensaver != null || track == null)
+                return;
+
             try
             {
-                screensaver = new AlbumScreensaver(() => track == null
-                    ? null
-                    : new NowPlaying(track, EffectiveArt(track, trackKey) ?? track.Artwork, lyrics));
+                // The island's shape on screen: the screensaver grows out of it
+                double w = Math.Max(1, width.Value), h = Math.Max(1, height.Value);
+                var island = new Rect(Left + islandLeft, Top + IslandTopInWindow(h), w, h);
 
-                screensaver.Dismissed += () => screensaver = null;
+                screensaver = new AlbumScreensaver(
+                    () => track == null || privacy.Current.Any || fullscreen.ProcessName != null
+                        ? null
+                        : new NowPlaying(track, EffectiveArt(track, trackKey) ?? track.Artwork, lyrics),
+                    island,
+                    byHand ? TimeSpan.FromSeconds(3) : TimeSpan.Zero);
+
+                // The island stays out of sight until it has gone, then shows what came in meanwhile
+                screensaver.Closed += (s, e) =>
+                {
+                    screensaver = null;
+                    SyncHiddenForApp();
+
+                    if (currentNotify == null && notifyQueue.Count > 0)
+                        ShowNextNotification();
+                };
+
                 screensaver.Show();
-                Log.Info("Album art screensaver started");
+                SyncHiddenForApp();
+                Log.Info(byHand ? "Screensaver opened from the menu" : "Screensaver started");
             }
             catch (Exception ex)
             {

@@ -21,7 +21,8 @@ namespace Islet
         // Called from ApplySettings, so the switch takes effect at once
         void SyncPrivacy()
         {
-            if (Settings.ShowPrivacyDots)
+            // The screensaver needs to know too, to stay away during a call
+            if (Settings.ShowPrivacyDots || Settings.ScreensaverEnabled)
                 privacy.Start();
             else
                 privacy.Stop();
@@ -32,7 +33,7 @@ namespace Islet
         void ShowPrivacy()
         {
             var use = privacy.Current;
-            bool hiddenForApp = fullscreen.ProcessName != null && Settings.ShouldHideFor(fullscreen.ProcessName);
+            bool hiddenForApp = IslandHiddenForApp();
             bool show = Settings.ShowPrivacyDots && use.Any && !hiddenForApp;
 
             PrivacyPill.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
@@ -59,7 +60,7 @@ namespace Islet
             double size = PrivacyPill.Height;
 
             double band = islandShown ? Math.Min(height.Value, 38) * scale : 30;
-            double top = IslandContainer.Margin.Top + (band - size) / 2;
+            double top = BandTop(band) + (band - size) / 2;
             double left = !islandShown ? islandLeft + w / 2 - size / 2
                 : Left + islandLeft + w / 2 > ScreenWidth * 0.75 ? visualLeft - PrivacyGap - size
                 : visualLeft + w * scale + PrivacyGap;
@@ -71,7 +72,9 @@ namespace Islet
                 // Centred under the dot, but kept inside the window
                 double labelWidth = PrivacyLabel.ActualWidth;
                 double labelLeft = Math.Clamp(left + size / 2 - labelWidth / 2, 4, Math.Max(4, Width - labelWidth - 4));
-                PrivacyLabel.Margin = new Thickness(labelLeft, top + size + 5, 0, 0);
+                // Away from the screen's edge: below the dot at the top, above it at the bottom
+                double labelTop = atBottom ? top - PrivacyLabel.ActualHeight - 5 : top + size + 5;
+                PrivacyLabel.Margin = new Thickness(labelLeft, labelTop, 0, 0);
             }
         }
 

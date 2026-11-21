@@ -715,6 +715,16 @@ namespace Islet
         public static string ShortDuration(TimeSpan time) =>
             time.TotalHours < 1 ? $"{(int)time.TotalMinutes} min" : Duration(time);
 
+        /// <summary>"2 h 14 min today · Arctic Monkeys", for where there's little room; null with nothing played yet.</summary>
+        public static string? DescribeShort(DaySummary today)
+        {
+            if (today.Total.TotalMinutes < 1)
+                return null;
+
+            string text = $"{Duration(today.Total)} today";
+            return today.TopArtist == null ? text : $"{text} · {today.TopArtist}";
+        }
+
         /// <summary>"Today: 2 h 14 min of music · mostly Arctic Monkeys", or null with nothing played yet.</summary>
         public static string? Describe(DaySummary today)
         {

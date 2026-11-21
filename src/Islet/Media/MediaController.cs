@@ -420,7 +420,7 @@ namespace Islet
 
                 // A music video, lyric video or audio upload on YouTube is the song it is, once the
                 // catalogs confirm that song exists; any other video stays a video
-                if (!music && AppSettings.Current.MusicVideosAsSongs && BrowserPreviews.LooksLikeMusicVideo(artist, title))
+                if (!music && AppSettings.Current.MusicVideosAsSongs && AppSettings.Current.LookUpOnline && BrowserPreviews.LooksLikeMusicVideo(artist, title))
                 {
                     song = await ArtworkService.SongFromVideoAsync(artist, title);
                     music = song != null;

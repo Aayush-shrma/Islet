@@ -134,7 +134,11 @@ namespace Islet
             }
             catch (Exception ex)
             {
-                Log.Error($"Lyrics lookup failed for {artist} - {title}", ex);
+                // LRCLIB being busy, or no network, is expected now and then
+                if (ex is HttpRequestException or TaskCanceledException)
+                    Log.Info($"Lyrics lookup didn't get an answer for {artist} - {title}: {ex.Message}");
+                else
+                    Log.Error($"Lyrics lookup failed for {artist} - {title}", ex);
                 throw;
             }
         }

@@ -26,10 +26,21 @@ namespace Islet
 
         void EnqueueChat(ChatNotification n)
         {
+            // Do Not Disturb is only looked at every couple of seconds; a notification right after it
+            // goes on shouldn't slip through that gap
+            if (Settings.FollowDoNotDisturb)
+                SyncQuiet();
+
             // During a focus session it waits, to arrive with the rest at the end
             if (HoldForFocus(n))
                 return;
 
+            Enqueue(BuildItem(n));
+        }
+
+        // What a notification looks like on the island, and what clicking it does
+        NotifyItem BuildItem(ChatNotification n)
+        {
             var (badge, url, logo) = n.App switch
             {
                 ChatApp.Discord => (Color.FromRgb(88, 101, 242),
@@ -40,20 +51,65 @@ namespace Islet
                 _ => (Color.FromRgb(72, 72, 74), null, null)
             };
 
-            Enqueue(new NotifyItem(
+            return new NotifyItem(
                 n.AppName,
                 n.Sender,
-                Settings.NotifyShowMessage && n.Message.Length > 0 ? n.Message : "New message",
+                Settings.NotifyShowMessage && n.Message.Length > 0 ? n.Message : n.App == ChatApp.Other ? "New notification" : "New message",
                 n.Icon,
                 badge,
                 0xE8BD,
                 () =>
                 {
+                    // Another app's notification opens Windows' notification centre, where it can be acted on
                     if (url != null)
                         OpenUrl(url);
+                    else if (n.App == ChatApp.Other)
+                        OpenUrl("ms-actioncenter:");
                 },
-                logo == null ? null : (Geometry)FindResource(logo)));
+                logo == null ? null : (Geometry)FindResource(logo));
         }
+
+        // ================= The yellow dot =================
+        //
+        // With the island's notifications off, a small yellow dot on its top-right corner says some
+        // arrived; it goes once they're read or cleared in Windows, or on clicking it, which opens
+        // Windows' notification centre. Unlike the mic and camera dot, it sits on the island itself.
+
+        void SetUpQuietDot()
+        {
+            notifications.QuietChanged += count => Dispatcher.BeginInvoke(ShowQuietDot);
+        }
+
+        void ShowQuietDot()
+        {
+            int count = notifications.QuietCount;
+            bool hiddenForApp = IslandHiddenForApp();
+            bool show = !Settings.ShowNotifications && count > 0 && !hiddenForApp && islandOpacity.Value > 0.5;
+
+            NotifyDot.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            NotifyDot.ToolTip = count == 1 ? "1 new notification" : $"{count} new notifications";
+            PlaceQuietDot();
+        }
+
+        // Follows the island every frame, perched on its top-right corner
+        void PlaceQuietDot()
+        {
+            if (NotifyDot.Visibility != Visibility.Visible)
+                return;
+
+            double w = Math.Max(1, width.Value);
+            double scale = islandScale.Value * dragPop.Value;
+            double visualLeft = islandLeft + islandOrigin * w * (1 - scale);
+            double size = NotifyDot.Width;
+            double corner = Math.Min(height.Value / 2, 19) * scale;
+
+            // On the curve of the corner, a little outside it, like an app's unread badge
+            NotifyDot.Margin = new Thickness(
+                visualLeft + w * scale - corner * 0.3 - size / 2,
+                IslandTopInWindow(height.Value * scale) + corner * 0.3 - size / 2, 0, 0);
+        }
+
+        void NotifyDot_Click(object sender, MouseButtonEventArgs e) => OpenUrl("ms-actioncenter:");
 
         void Enqueue(NotifyItem item)
         {
@@ -63,7 +119,8 @@ namespace Islet
 
             notifyQueue.Enqueue(item);
 
-            if (currentNotify == null)
+            // Kept for when you're back, rather than shown on an island nobody can see
+            if (currentNotify == null && screensaver == null)
                 ShowNextNotification();
         }
 
