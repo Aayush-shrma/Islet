@@ -92,8 +92,8 @@ namespace Islet
                 (int)Settings.Size,
                 i => { Settings.Size = (IslandSize)i; Settings.Save(); });
 
-            ChoiceRow(look, "While music plays", "The island's shape when it isn't open.",
-                new[] { "Pill with bars", "Spinning album art", "Small pill" },
+            ChoiceRow(look, "While music plays", "The island's shape when it isn't open. Tiny and Line keep out of the way.",
+                new[] { "Pill with bars", "Circle with bars", "Small pill", "Tiny", "Line" },
                 (int)Settings.MusicLook,
                 i => { Settings.MusicLook = (MusicLook)i; Settings.Save(); });
 
@@ -110,7 +110,11 @@ namespace Islet
                 out performanceNote);
 
             var position = Group("Position");
-            Row(position, "Where it sits", "Hold the island for a second, then drag it anywhere along the top.",
+            ChoiceRow(position, "Edge", "At the bottom it sits above the taskbar and opens upwards.",
+                new[] { "Top", "Bottom" },
+                (int)Settings.IslandEdge,
+                i => { Settings.IslandEdge = (IslandEdge)i; Settings.Save(); });
+            Row(position, "Where it sits", "Hold the island for a second, then drag it anywhere along the top or bottom.",
                 PillButton("Move to the centre", () =>
                 {
                     Settings.IslandX = 0.5;
@@ -120,7 +124,7 @@ namespace Islet
             var idle = Group("When nothing is playing");
 
             ChoiceRow(idle, "Idle look", null,
-                new[] { "Camera notch", "Hide", "Clock", "Clock + weather", "Circle" },
+                new[] { "Tiny clock", "Hide", "Clock", "Clock + weather", "Circle" },
                 (int)Settings.IdleMode,
                 i =>
                 {
@@ -128,6 +132,11 @@ namespace Islet
                     Settings.Save();
                     _ = island.RefreshWeatherAsync();
                 });
+
+            ChoiceRow(idle, "Date", "Nepal's calendar (Bikram Sambat) on the island, in English letters or Nepali.",
+                new[] { "Usual", "Nepali", "नेपाली" },
+                (int)Settings.NepaliDate,
+                i => { Settings.NepaliDate = (NepaliDateStyle)i; Settings.Save(); });
 
             int[] delays = { 5, 15, 60, 0 };
             ChoiceRow(idle, "Go idle after the music pauses for", null,
@@ -215,9 +224,6 @@ namespace Islet
             SwitchRow(sources, "Music in your browser",
                 "Spotify Web, YouTube Music, SoundCloud, Apple Music on the web and more, in Chrome, Edge, Firefox, Opera or Brave.",
                 Settings.SourceBrowsers, v => { Settings.SourceBrowsers = v; Settings.Save(); });
-            SwitchRow(sources, "Music videos as songs",
-                "Official music videos, lyric videos and audio uploads on YouTube show as the song, with its album cover, and count in your listening stats. Other videos stay off. Checked against Deezer and iTunes by song name.",
-                Settings.MusicVideosAsSongs, v => { Settings.MusicVideosAsSongs = v; Settings.Save(); });
             SwitchRow(sources, "Videos on websites",
                 "YouTube, Instagram, X and other videos. Off keeps the island to music; on, a video shows once it has played for a few seconds, so previews and feed clips stay off.",
                 Settings.ShowWebVideos, v => { Settings.ShowWebVideos = v; Settings.Save(); });
@@ -228,9 +234,6 @@ namespace Islet
             var playing = Group("While it plays");
             SwitchRow(playing, "Synced lyrics", "The current line appears under the song when you open the island. Lyrics by LRCLIB.",
                 Settings.ShowLyrics, v => { Settings.ShowLyrics = v; Settings.Save(); });
-            SwitchRow(playing, "Real covers for music videos",
-                "Video sites only share a video frame, so Islet looks up the song's real cover in Apple's iTunes catalogue.",
-                Settings.FindVideoArt, v => { Settings.FindVideoArt = v; Settings.Save(); });
             SwitchRow(playing, "Real-time audio visualizer",
                 "The bars follow the actual bass, mids and treble coming out of your speakers. Turn off for a lighter animated pattern.",
                 Settings.RealAudioVisualizer, v => { Settings.RealAudioVisualizer = v; Settings.Save(); });
@@ -245,12 +248,29 @@ namespace Islet
                 i => { Settings.ScrollTarget = (ScrollTarget)i; Settings.Save(); });
 
             var away = Group("While you're away");
-            int[] screensaverMinutes = { 0, 2, 5, 10 };
-            ChoiceRow(away, "Album art screensaver",
-                "When you're away while music plays, the island grows into a full-screen cover with lyrics. Any key or mouse movement brings you back.",
-                new[] { "Off", "2 min", "5 min", "10 min" },
+            int[] screensaverMinutes = { 2, 5, 10 };
+            SwitchRow(away, "Screensaver",
+                "When you're away while music plays, the cover and the song's lyrics fill the screen. Not during calls, videos or games. Any key or mouse movement brings you back.",
+                Settings.ScreensaverEnabled, v => { Settings.ScreensaverEnabled = v; Settings.Save(); });
+            ChoiceRow(away, "Starts after", null,
+                new[] { "2 min", "5 min", "10 min" },
                 Math.Max(0, Array.IndexOf(screensaverMinutes, Settings.ScreensaverMinutes)),
                 i => { Settings.ScreensaverMinutes = screensaverMinutes[i]; Settings.Save(); });
+
+            // Everything that asks Deezer or iTunes, together: the main switch, then each use of it
+            var online = Group("Looked up online");
+            SwitchRow(online, "Look things up online",
+                "Only song, artist and album names are sent, to Deezer and Apple's iTunes. Off, none of the things below leave this PC. Lyrics (LRCLIB) and weather have their own switches.",
+                Settings.LookUpOnline, v => { Settings.LookUpOnline = v; Settings.Save(); });
+            SwitchRow(online, "Music videos as songs",
+                "Official music videos, lyric videos and audio uploads on YouTube show as the song, with its album cover, and count in your listening stats. Other videos stay off.",
+                Settings.MusicVideosAsSongs, v => { Settings.MusicVideosAsSongs = v; Settings.Save(); });
+            SwitchRow(online, "Real covers for music videos",
+                "Video sites only share a video frame, so the song's real cover is looked up. Songs a player sends without a cover get one too.",
+                Settings.FindVideoArt, v => { Settings.FindVideoArt = v; Settings.Save(); });
+            SwitchRow(online, "Missing covers in your listening stats",
+                "For songs played before covers were kept, or whose player gave none. Kept with the stats.",
+                Settings.FindStatsCovers, v => { Settings.FindStatsCovers = v; Settings.Save(); });
 
             var account = Group("Spotify account");
             Row(account, "Like button",
@@ -340,6 +360,14 @@ namespace Islet
             Row(access, "Permission to read notifications", " ", accessButton, null, out notifyStatus);
             UpdateNotifyStatus();
 
+            var islandGroup = Group("On the island");
+            SwitchRow(islandGroup, "Show notifications on the island",
+                "Off, a yellow dot on the island's corner says some arrived; it goes once they're read in Windows, or click it to open them.",
+                Settings.ShowNotifications, v => { Settings.ShowNotifications = v; Settings.Save(); });
+            SwitchRow(islandGroup, "Hide Windows' own pop-ups",
+                "Each notification the island shows is cleared from Windows, which closes its pop-up in the corner. They won't be in Windows' notification centre afterwards.",
+                Settings.HideWindowsPopups, v => { Settings.HideWindowsPopups = v; Settings.Save(); });
+
             var messages = Group("Messages");
             SwitchRow(messages, "Discord", null, Settings.NotifyDiscord,
                 v => { Settings.NotifyDiscord = v; Settings.Save(); UpdateNotifyStatus(); });
@@ -347,15 +375,15 @@ namespace Islet
                 v => { Settings.NotifyWhatsApp = v; Settings.Save(); UpdateNotifyStatus(); });
             SwitchRow(messages, "Messenger", null, Settings.NotifyMessenger,
                 v => { Settings.NotifyMessenger = v; Settings.Save(); UpdateNotifyStatus(); });
-            SwitchRow(messages, "Other notifications from your browser",
-                "Windows doesn't say which website a browser tab's notification came from, so these show under the browser's name.",
-                Settings.NotifyBrowsers, v => { Settings.NotifyBrowsers = v; Settings.Save(); UpdateNotifyStatus(); });
+            SwitchRow(messages, "Every other app",
+                "Mail, Teams, calendars, game launchers, your browser and the websites in it, Windows itself: any notification, under its app's name and icon.",
+                Settings.NotifyOtherApps, v => { Settings.NotifyOtherApps = v; Settings.Save(); UpdateNotifyStatus(); });
             SwitchRow(messages, "Show message text", "Off shows only who it's from.", Settings.NotifyShowMessage,
                 v => { Settings.NotifyShowMessage = v; Settings.Save(); });
 
             var quiet = Group("Quiet times");
             SwitchRow(quiet, "Hold messages while Windows' Do Not Disturb is on",
-                "Like a focus session: messages wait quietly, then arrive as one summary when Do Not Disturb turns off.",
+                "While it's on, notifications wait behind an orange dot beside the island, and stay in Windows' notification centre. When it turns off, new ones show as usual and the held ones aren't shown again.",
                 Settings.FollowDoNotDisturb, v => { Settings.FollowDoNotDisturb = v; Settings.Save(); });
 
             var onIsland = Group("Also on the island");
@@ -611,6 +639,10 @@ namespace Islet
                 : "Updates are signed, and checked before they're installed.";
             ShowUpdateNotes(island.AvailableUpdate);
 
+            // With no update waiting, what's new in the version installed
+            if (island.AvailableUpdate == null)
+                _ = ShowInstalledNotesAsync();
+
             SwitchRow(updates, "Check for updates automatically", "At launch and every 12 hours.",
                 Settings.AutoUpdate, v => { Settings.AutoUpdate = v; Settings.Save(); });
 
@@ -645,6 +677,15 @@ namespace Islet
                 ? $"Version {release.Version} is available." +
                   (UpdateService.CanSelfUpdate ? "" : " This copy wasn't installed by the installer, so Install opens the download page.")
                 : "You're up to date.";
+        }
+
+        async Task ShowInstalledNotesAsync()
+        {
+            var version = UpdateService.CurrentVersion;
+            var notes = await UpdateService.NotesForAsync(null, version);
+
+            if (notes.Count > 0 && island.AvailableUpdate == null && IsLoaded)
+                ShowUpdateNotes(new UpdateService.Release(version, $"v{version}", "", "", "") { Notes = notes });
         }
 
         // What's new in the update found, a short line each, under the update row

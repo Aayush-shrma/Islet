@@ -296,12 +296,12 @@ namespace Islet
             {
                 var dot = new Ellipse
                 {
-                    Width = 12,
-                    Height = 12,
+                    Width = 8,
+                    Height = 8,
                     Fill = new SolidColorBrush(shown[i]),
                     Stroke = Brushes.Black,
-                    StrokeThickness = 1.5,
-                    Margin = new Thickness(i == 0 ? 0 : -5, 0, 0, 0),
+                    StrokeThickness = 1,
+                    Margin = new Thickness(i == 0 ? 0 : -3, 0, 0, 0),
                     RenderTransformOrigin = new Point(0.5, 0.5),
                     RenderTransform = new ScaleTransform()
                 };
@@ -317,25 +317,33 @@ namespace Islet
 
         void ShowColorPill()
         {
-            bool hiddenForApp = fullscreen.ProcessName != null && Settings.ShouldHideFor(fullscreen.ProcessName);
+            bool hiddenForApp = IslandHiddenForApp();
             bool show = PaletteOn && palette.Colors.Count > 0 && surface != Surface.Palette && !hiddenForApp;
 
             ColorPill.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
             PlaceColorPill();
         }
 
-        // Right of the island, past the privacy dot when that's on the right too; on the left,
-        // past the shelf's badge, when there's no room
+        // The two small badges, the held notifications' bubble above and the colour picker's pill
+        // below, in a column beside the island: on its right, past the mic and camera dot when
+        // that's on the right too; on its left, past the shelf's badge, when there's no room
         void PlaceColorPill()
         {
-            if (ColorPill.Visibility != Visibility.Visible)
+            bool heldShown = HeldPill.Visibility == Visibility.Visible;
+            bool colourShown = ColorPill.Visibility == Visibility.Visible;
+
+            if (!heldShown && !colourShown)
                 return;
 
             const double gap = 6;
+            const double between = 0;
             double w = Math.Max(1, width.Value);
             double scale = islandScale.Value * dragPop.Value;
-            double pill = ColorPill.ActualWidth > 0 ? ColorPill.ActualWidth : 40;
             bool islandShown = islandOpacity.Value > 0.5;
+
+            double heldW = heldShown ? HeldPill.Width : 0;
+            double pillW = colourShown ? (ColorPill.ActualWidth > 0 ? ColorPill.ActualWidth : 18) : 0;
+            double column = Math.Max(heldW, pillW);
 
             double visualLeft = islandLeft + islandOrigin * w * (1 - scale);
             double visualRight = visualLeft + w * scale;
@@ -348,17 +356,32 @@ namespace Islet
             double privacyWidth = privacyShown ? PrivacyPill.Width + gap : 0;
 
             double left = visualRight + gap + (privacyShown && !privacyLeft ? privacyWidth : 0);
+            bool onRight = true;
 
-            if (left + pill > Width - 2)
+            if (left + column > Width - 2)
             {
                 double shelfWidth = ShelfPill.Visibility == Visibility.Visible ? ShelfPill.ActualWidth + gap : 0;
-                left = visualLeft - gap - pill - (privacyLeft ? privacyWidth : 0) - shelfWidth;
+                left = visualLeft - gap - column - (privacyLeft ? privacyWidth : 0) - shelfWidth;
+                onRight = false;
             }
 
+            // Centred on the island's row; kept on screen when the island is shorter than the stack
             double band = islandShown ? Math.Min(height.Value, 38) * scale : 30;
-            double top = IslandContainer.Margin.Top + (band - ColorPill.Height) / 2;
+            double stack = (heldShown ? HeldPill.Height : 0) + (colourShown ? ColorPill.Height : 0) + (heldShown && colourShown ? between : 0);
+            double top = BandTop(band) + (band - stack) / 2;
+            top = atBottom ? Math.Min(top, Height - 2 - stack) : Math.Max(top, 2);
 
-            ColorPill.Margin = new Thickness(left, top, 0, 0);
+            // Against the island's side of the column
+            double Edge(double itemWidth) => onRight ? left : left + column - itemWidth;
+
+            if (heldShown)
+            {
+                HeldPill.Margin = new Thickness(Edge(heldW), top, 0, 0);
+                top += HeldPill.Height + between;
+            }
+
+            if (colourShown)
+                ColorPill.Margin = new Thickness(Edge(pillW), top, 0, 0);
         }
 
         void ColorPill_Click(object sender, MouseButtonEventArgs e) => OpenPalette();

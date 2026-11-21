@@ -220,8 +220,89 @@ public class NotificationClassifyTests
     }
 
     [Fact]
-    public void Other_apps_are_ignored_even_with_a_chat_address()
+    public void Other_apps_are_their_own_even_with_a_chat_address()
     {
-        Assert.Null(NotificationWatcher.Classify("Outlook", new List<string> { "Sam", "discord.com" }).App);
+        // Outlook mentioning discord.com is still Outlook, not a Discord message
+        Assert.Equal(ChatApp.Other, NotificationWatcher.Classify("Outlook", new List<string> { "Sam", "discord.com" }).App);
+        Assert.Equal(ChatApp.Other, NotificationWatcher.Classify("Microsoft Teams", new List<string> { "Meeting in 5 minutes" }).App);
+    }
+}
+
+public class LyricOffsetsTests
+{
+    [Fact]
+    public void A_songs_lyric_timing_is_remembered_by_artist_and_title()
+    {
+        LyricOffsets.Set("Daft Punk", "Instant Crush", 1.5);
+
+        // The same song from another player, written a little differently, finds the same timing
+        Assert.Equal(1.5, LyricOffsets.For("DAFT PUNK", "Instant Crush"));
+        Assert.Equal(0, LyricOffsets.For("Daft Punk", "Get Lucky"));
+
+        LyricOffsets.Set("Daft Punk", "Instant Crush", 0);
+        Assert.Equal(0, LyricOffsets.For("Daft Punk", "Instant Crush"));
+    }
+}
+
+public class IslandEdgeTests
+{
+    [Theory]
+    [InlineData(100, IslandEdge.Top)]
+    [InlineData(539, IslandEdge.Top)]
+    [InlineData(541, IslandEdge.Bottom)]
+    [InlineData(1050, IslandEdge.Bottom)]
+    public void A_dropped_island_goes_to_the_nearer_edge(double y, IslandEdge edge) =>
+        Assert.Equal(edge, MainWindow.EdgeFor(y, 1080));
+}
+
+public class NepaliDateTests
+{
+    [Theory]
+    [InlineData(2024, 4, 13, 2081, 1, 1)]   // New Year 2081
+    [InlineData(2025, 4, 14, 2082, 1, 1)]   // New Year 2082
+    [InlineData(2026, 4, 14, 2083, 1, 1)]   // New Year 2083
+    [InlineData(2026, 4, 13, 2082, 12, 30)] // the day before: the last of Chaitra
+    [InlineData(2026, 11, 15, 2083, 7, 29)] // Kartik 29
+    public void Converts_to_Bikram_Sambat(int y, int m, int d, int bsYear, int bsMonth, int bsDay) =>
+        Assert.Equal((bsYear, bsMonth, bsDay), NepaliDate.From(new DateTime(y, m, d)));
+
+    [Fact]
+    public void Writes_it_in_English_letters_or_Nepali()
+    {
+        var day = new DateTime(2026, 11, 15);
+
+        Assert.Equal("Kartik 29", NepaliDate.MonthDay(day, inNepali: false));
+        Assert.Equal("कात्तिक २९", NepaliDate.MonthDay(day, inNepali: true));
+        Assert.Equal("आइतबार, कात्तिक २९", NepaliDate.Long(day, inNepali: true));
+        Assert.Equal("२०८३", NepaliDate.Digits(2083));
+    }
+
+    [Fact]
+    public void Says_nothing_outside_its_table() =>
+        Assert.Null(NepaliDate.From(new DateTime(2000, 1, 1)));
+}
+
+public class DateTextTests
+{
+    [Fact]
+    public void Dates_follow_the_languages_own_order()
+    {
+        var before = System.Globalization.CultureInfo.CurrentCulture;
+
+        try
+        {
+            var day = new DateTime(2026, 11, 15);
+
+            System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("en-US");
+            Assert.Equal("Sunday, November 15", DateText.Long(day));
+            Assert.Equal("Sun, Nov 15", DateText.Short(day));
+
+            System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("en-GB");
+            Assert.Equal("Sunday, 15 November", DateText.Long(day));
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = before;
+        }
     }
 }

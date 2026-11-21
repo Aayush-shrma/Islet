@@ -30,7 +30,7 @@ namespace Islet
 
             if (lyricsCache.TryGetValue(key, out var cached))
             {
-                lyrics = cached;
+                SetLyrics(cached);
                 ResetLyric();
                 ApplyLyricsLayout();
                 return;
@@ -92,10 +92,43 @@ namespace Islet
             if (key != trackKey)
                 return;
 
-            lyrics = result;
+            SetLyrics(result);
             ResetLyric();
             ApplyLyricsLayout();
         }
+
+        // The lyrics as found, before any nudge of their timing
+        IReadOnlyList<LyricsService.Line>? lyricsFound;
+
+        void SetLyrics(IReadOnlyList<LyricsService.Line>? lines)
+        {
+            lyricsFound = lines;
+            double nudge = track == null ? 0 : LyricOffsets.For(track.Artist, track.Title);
+
+            lyrics = lines == null || nudge == 0
+                ? lines
+                : lines.Select(l => l with { Time = l.Time + TimeSpan.FromSeconds(nudge) }).ToList();
+        }
+
+        /// <summary>Moves this song's lyrics later (positive) or earlier, half a second at a time, remembered.</summary>
+        void NudgeLyrics(double seconds)
+        {
+            if (track == null || lyricsFound == null)
+                return;
+
+            double now = seconds == 0 ? 0 : LyricOffsets.For(track.Artist, track.Title) + seconds;
+            LyricOffsets.Set(track.Artist, track.Title, now);
+            SetLyrics(lyricsFound);
+            ResetLyric();
+            EnsureRendering();
+        }
+
+        void LyricsEarlier_Click(object sender, RoutedEventArgs e) => NudgeLyrics(-0.5);
+        void LyricsLater_Click(object sender, RoutedEventArgs e) => NudgeLyrics(0.5);
+        void LyricsReset_Click(object sender, RoutedEventArgs e) => NudgeLyrics(0);
+
+        // A smaller layout put off while the pointer is on the open island
+        bool shrinkHeld;
 
         void ApplyLyricsLayout()
         {
@@ -104,12 +137,20 @@ namespace Islet
             LyricRow.Visibility = style == LyricsStyle.Line ? Visibility.Visible : Visibility.Collapsed;
             LyricStage.Visibility = style == LyricsStyle.Stage ? Visibility.Visible : Visibility.Collapsed;
             UpdateCoverBackdrop();
-            ExpandedMusic.Height = (style switch
+
+            double wanted = (style switch
             {
-                LyricsStyle.Line => 204,
+                LyricsStyle.Line => 220,
                 LyricsStyle.Stage => 266,
                 _ => 172
             }) + (MusicTimerCard.Visibility == Visibility.Visible ? TimerCard.SectionHeight : 0);
+
+            // Between songs the lyrics go for a moment and come back: shrinking then would pull the
+            // island out from under the pointer, and it would close. It waits until the pointer leaves.
+            shrinkHeld = surface == Surface.ExpandedMusic && IslandContainer.IsMouseOver && wanted < ExpandedMusic.Height;
+
+            if (!shrinkHeld)
+                ExpandedMusic.Height = wanted;
 
             if (surface == Surface.ExpandedMusic)
             {

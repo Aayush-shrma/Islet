@@ -20,7 +20,9 @@ namespace Islet
         TimerPill,
         Shelf,
         Palette,
-        Locks
+        Locks,
+        TinyMusic,
+        LineMusic
     }
 
     /// <summary>Everything that decides which shape the island takes, at one moment.</summary>
@@ -94,15 +96,21 @@ namespace Islet
             if (i.Idle && i.IdleMode == IdleMode.Hide)
                 return i.TimerActive ? Surface.TimerPill : Surface.Hidden;
 
+            // The tiny looks have no room for a timer, so while one runs they make way for a shape that has
             if (!i.Idle)
                 return i.PeekShowing ? Surface.Peek
-                    : i.MusicLook == MusicLook.Disc ? Surface.MiniMusic
-                    : i.MusicLook == MusicLook.Small ? Surface.SmallMusic
-                    : Surface.CompactMusic;
+                    : i.MusicLook switch
+                    {
+                        MusicLook.Disc => Surface.MiniMusic,
+                        MusicLook.Small => Surface.SmallMusic,
+                        MusicLook.Tiny => i.TimerActive ? Surface.SmallMusic : Surface.TinyMusic,
+                        MusicLook.Line => i.TimerActive ? Surface.SmallMusic : Surface.LineMusic,
+                        _ => Surface.CompactMusic
+                    };
 
             return i.IdleMode switch
             {
-                IdleMode.Notch => Surface.Notch,
+                IdleMode.Notch => i.TimerActive ? Surface.TimerPill : Surface.Notch,
                 IdleMode.Circle => Surface.MiniIdle,
                 _ => Surface.CompactAmbient
             };

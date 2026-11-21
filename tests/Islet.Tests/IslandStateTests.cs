@@ -26,6 +26,29 @@ namespace Islet.Tests
             Assert.Equal(expected, IslandState.Choose(new IslandInputs { Idle = true, IdleMode = mode }));
 
         [Fact]
+        public void TheTinyLooksShowWhileMusicPlays()
+        {
+            Assert.Equal(Surface.TinyMusic, IslandState.Choose(new IslandInputs { HasTrack = true, MusicLook = MusicLook.Tiny }));
+            Assert.Equal(Surface.LineMusic, IslandState.Choose(new IslandInputs { HasTrack = true, MusicLook = MusicLook.Line }));
+        }
+
+        [Fact]
+        public void TheTinyLooksMakeWayForARunningTimer()
+        {
+            // No room for a timer in them, so a shape that has one takes over while it runs
+            Assert.Equal(Surface.SmallMusic, IslandState.Choose(new IslandInputs { HasTrack = true, MusicLook = MusicLook.Tiny, TimerActive = true }));
+            Assert.Equal(Surface.SmallMusic, IslandState.Choose(new IslandInputs { HasTrack = true, MusicLook = MusicLook.Line, TimerActive = true }));
+            Assert.Equal(Surface.TimerPill, IslandState.Choose(new IslandInputs { Idle = true, IdleMode = IdleMode.Notch, TimerActive = true }));
+        }
+
+        [Fact]
+        public void VolumeTakesTheSmallShapeOverTheTinyLooks()
+        {
+            Assert.Equal(StatusLayout.Small, SystemStatus.LayoutFor(false, IdleMode.Clock, MusicLook.Tiny));
+            Assert.Equal(StatusLayout.Small, SystemStatus.LayoutFor(false, IdleMode.Clock, MusicLook.Line));
+        }
+
+        [Fact]
         public void AHiddenIdleIslandStillShowsARunningTimer()
         {
             var hidden = new IslandInputs { Idle = true, IdleMode = IdleMode.Hide, TimerActive = true };

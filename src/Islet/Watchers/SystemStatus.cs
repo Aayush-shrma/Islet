@@ -39,7 +39,7 @@ namespace Islet
             return musicLook switch
             {
                 MusicLook.Disc => StatusLayout.Ring,
-                MusicLook.Small => StatusLayout.Small,
+                MusicLook.Small or MusicLook.Tiny or MusicLook.Line => StatusLayout.Small,
                 _ => StatusLayout.Pill
             };
         }

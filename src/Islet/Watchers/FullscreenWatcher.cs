@@ -97,6 +97,12 @@ namespace Islet
             if (hwnd == IntPtr.Zero || hwnd == own || !IsWindowVisible(hwnd))
                 return IntPtr.Zero;
 
+            // Islet's own windows (the screensaver covers the whole screen) aren't a game or a film
+            GetWindowThreadProcessId(hwnd, out uint owner);
+
+            if (owner == Environment.ProcessId)
+                return IntPtr.Zero;
+
             var className = new StringBuilder(256);
             GetClassName(hwnd, className, className.Capacity);
 

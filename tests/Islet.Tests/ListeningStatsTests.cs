@@ -27,6 +27,7 @@ namespace Islet.Tests
             Assert.Equal("Arctic Monkeys", today.TopArtist);
             Assert.Equal("Do I Wanna Know? — Arctic Monkeys", today.TopSong);
             Assert.Equal("Today: 2 h 14 min of music · mostly Arctic Monkeys", ListeningStats.Describe(today));
+            Assert.Equal("2 h 14 min today · Arctic Monkeys", ListeningStats.DescribeShort(today));
         }
 
         [Fact]

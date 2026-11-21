@@ -47,10 +47,9 @@ namespace Islet
 
         // Blurred once into a small bitmap rather than with a live effect, so the card's
         // animations don't redo the blur every frame; scaling it up softens it further
-        internal static BitmapSource BlurredCover(BitmapSource art)
+        internal static BitmapSource BlurredCover(BitmapSource art, int size = 120)
         {
-            const int size = 120;
-            const double overscan = size * 0.2;
+            double overscan = size * 0.2;
 
             // Drawn larger than the bitmap, so the blur's faded edges fall outside it
             var image = new Image
@@ -59,7 +58,7 @@ namespace Islet
                 Stretch = Stretch.UniformToFill,
                 Width = size + overscan * 2,
                 Height = size + overscan * 2,
-                Effect = new BlurEffect { Radius = 16, RenderingBias = RenderingBias.Quality }
+                Effect = new BlurEffect { Radius = 16.0 * size / 120, RenderingBias = RenderingBias.Quality }
             };
 
             var host = new Canvas { Width = size, Height = size, ClipToBounds = true, Background = Brushes.Black };

@@ -77,6 +77,12 @@ namespace Islet
             peekMusicPanel, peekNotifyPanel, expandedMusicPanel, expandedAmbientPanel, timerPillPanel;
 
         readonly Rectangle[] compactBars;
+        readonly Rectangle[] tinyBars;
+        readonly Rectangle[] miniBars;
+
+        // When the player last reported nothing playing while the open island was under the pointer
+        DateTime? goneSince;
+        readonly Panel tinyMusicPanel, lineMusicPanel;
         readonly Rectangle[] smallBars;
         readonly Rectangle[] expandedBars;
         readonly Rectangle[] peekBars;
@@ -87,7 +93,7 @@ namespace Islet
         Surface surface = (Surface)(-1);
         bool rendering;
         TimeSpan lastFrame;
-        double discAngle, orbAngle;
+        double orbAngle;
 
         TrackInfo? track;
         bool playing;
@@ -136,7 +142,7 @@ namespace Islet
         {
             InitializeComponent();
 
-            springs = new[] { width, height, islandOpacity, islandScale, volumeLevel, volumeRow, glow, heartScale, seekGrow, discSpeed, artPop, peekLift, openRows, dockX, grab, dragLift, dragPop, stretch, lean, backdropLevel, shelfScroll };
+            springs = new[] { width, height, islandOpacity, islandScale, volumeLevel, volumeRow, glow, heartScale, seekGrow, discSpeed, artPop, peekLift, openRows, dockX, dockY, grab, dragLift, dragPop, stretch, lean, backdropLevel, shelfScroll };
 
             compactMusicPanel = AddPanel(CompactMusic, 0.88);
             smallMusicPanel = AddPanel(SmallMusic, 0.88);
@@ -147,6 +153,8 @@ namespace Islet
             statusSmallPanel = AddPanel(StatusSmall, 0.88);
             statusRingPanel = AddPanel(StatusRing, 0.7);
             notchPanel = AddPanel(NotchPanel, 0.9);
+            tinyMusicPanel = AddPanel(TinyMusic, 0.88);
+            lineMusicPanel = AddPanel(LineMusic, 0.9);
             peekMusicPanel = AddPanel(PeekMusic, 0.9, 0.3);
             peekNotifyPanel = AddPanel(PeekNotify, 0.9, 0.3);
             expandedMusicPanel = AddPanel(ExpandedMusic, 0.9, 0.42);
@@ -158,6 +166,9 @@ namespace Islet
 
             compactBars = CreateBars(CompactBars, 3, 1.5);
             smallBars = CreateBars(SmallBars, 2, 1);
+            tinyBars = CreateBars(TinyBars, 1.5, 1.5, 3);
+            miniBars = CreateBars(MiniBars, 2, 1.5, 3);
+            LineProgress.Background = barBrush;
             expandedBars = CreateBars(ExpandedBars, 3.5, 1.75);
             peekBars = CreateBars(PeekBars, 3, 1.5);
             ApplyOrbColor(accentColor);
@@ -177,6 +188,15 @@ namespace Islet
             SetUpClipboard();
             SetUpLocks();
             SetUpListening();
+
+            // A pop-up the island will take over is kept out of sight from the moment it appears
+            winEvents = new WinEventWatcher(OnTaskbarMoved, () =>
+            {
+                notifications.PollNow(fromEvent: true);
+                return notifications.Running && Settings.ShowNotifications && Settings.HideWindowsPopups && !notifications.KeepInWindows;
+            });
+            notifications.PopupNotTaken += winEvents.RevealToast;
+            Closed += (s, e) => winEvents.Dispose();
 
             systemStatus.VolumeChanged += (level, muted) => Dispatcher.BeginInvoke(() =>
             {
@@ -218,6 +238,11 @@ namespace Islet
                 if (!IslandContainer.IsMouseOver && IslandContainer.ContextMenu?.IsOpen != true)
                 {
                     hovering = false;
+
+                    // A smaller layout put off while the pointer was on it can happen now
+                    if (shrinkHeld)
+                        ApplyLyricsLayout();
+
                     UpdateSurface();
                 }
             };
@@ -254,7 +279,15 @@ namespace Islet
             };
 
             notifications.Received += EnqueueChat;
+            SetUpQuietDot();
             updateTimer.Tick += async (s, e) => await CheckForUpdatesAsync(announce: true);
+
+            // A few seconds in, once the island has settled
+            _ = Dispatcher.InvokeAsync(async () =>
+            {
+                await Task.Delay(TimeSpan.FromSeconds(4));
+                await SayWhatsNewAsync();
+            });
             App.SecondInstanceLaunched += () => OpenSettings();
 
             clockTimer.Tick += (s, e) =>
@@ -319,9 +352,9 @@ namespace Islet
             return panel;
         }
 
-        Rectangle[] CreateBars(StackPanel host, double barWidth, double gap)
+        Rectangle[] CreateBars(StackPanel host, double barWidth, double gap, int count = 0)
         {
-            var result = new Rectangle[AudioVisualizer.BandCount];
+            var result = new Rectangle[count > 0 ? count : AudioVisualizer.BandCount];
 
             for (int i = 0; i < result.Length; i++)
             {
@@ -420,7 +453,7 @@ namespace Islet
             SyncClipboard();
             ApplyDock();
 
-            if (Settings.NotifyDiscord || Settings.NotifyWhatsApp || Settings.NotifyMessenger || Settings.NotifyBrowsers)
+            if (Settings.NotifyDiscord || Settings.NotifyWhatsApp || Settings.NotifyMessenger || Settings.NotifyOtherApps)
             {
                 if (!notificationsRequested)
                 {
@@ -433,6 +466,8 @@ namespace Islet
                 notifications.Stop();
                 notificationsRequested = false;
             }
+
+            SyncWinEvents();
 
             if (Settings.AutoUpdate) updateTimer.Start(); else updateTimer.Stop();
 
@@ -458,6 +493,21 @@ namespace Islet
             QueueTrackUpdate();
         }
 
+        // Out of the way of a game or film that asks for it, and of the screensaver
+        bool IslandHiddenForApp() =>
+            screensaver != null || (fullscreen.ProcessName != null && Settings.ShouldHideFor(fullscreen.ProcessName));
+
+        // The island and its little pills, shown or hidden again after that changes
+        void SyncHiddenForApp()
+        {
+            UpdateSurface();
+            ShowPrivacy();
+            ShowQuietDot();
+            ShowHeldDot();
+            ShowShelfPill();
+            ShowColorPill();
+        }
+
         void OnFullscreenChanged()
         {
             if (fullscreen.ProcessName != null)
@@ -469,10 +519,7 @@ namespace Islet
                 : $"Full-screen app in front: {fullscreen.ProcessName}" +
                   (Settings.ShouldHideFor(fullscreen.ProcessName) ? ", hiding the island" : ", island stays"));
 
-            UpdateSurface();
-            ShowPrivacy();
-            ShowShelfPill();
-            ShowColorPill();
+            SyncHiddenForApp();
         }
 
         // ================= State → shape =================
@@ -485,7 +532,7 @@ namespace Islet
 
             return IslandState.Choose(new IslandInputs
             {
-                HiddenForApp = fullscreen.ProcessName != null && Settings.ShouldHideFor(fullscreen.ProcessName),
+                HiddenForApp = IslandHiddenForApp(),
                 TimerActive = TimerActive,
                 TimerRinging = TimerRinging,
                 ShelfWanted = ShelfWanted,
@@ -507,7 +554,7 @@ namespace Islet
             var next = ChooseSurface();
 
             // When the island can't appear, Windows keeps its own pop-up
-            bool hiddenForApp = fullscreen.ProcessName != null && Settings.ShouldHideFor(fullscreen.ProcessName);
+            bool hiddenForApp = IslandHiddenForApp();
             volumeKeys.Active = Settings.ShowSystemStatus && Settings.ReplaceVolumePopup && !hiddenForApp;
             SyncVisualizer(next);
 
@@ -531,10 +578,12 @@ namespace Islet
             (double w, double h, Panel? active) = next switch
             {
                 Surface.Hidden => (100.0, 28.0, null),
-                Surface.Notch => (112.0, 30.0, notchPanel),
+                Surface.Notch => TinyClockSize(),
+                Surface.TinyMusic => (84.0, 24.0, tinyMusicPanel),
+                Surface.LineMusic => (120.0, 10.0, lineMusicPanel),
                 Surface.SmallMusic => (112.0, 30.0, smallMusicPanel),
                 Surface.MiniMusic => (38.0, 38.0, miniMusicPanel),
-                Surface.MiniIdle => (30.0, 30.0, miniIdlePanel),
+                Surface.MiniIdle => (38.0, 38.0, miniIdlePanel),
                 Surface.CompactAmbient => (210.0, 38.0, compactAmbientPanel),
                 Surface.Volume => (264.0, 38.0, volumePanel),
                 Surface.StatusSmall => (150.0, 30.0, statusSmallPanel),
@@ -549,6 +598,8 @@ namespace Islet
                 Surface.ExpandedAmbient => (400.0, ExpandedAmbient.Height, expandedAmbientPanel),
                 _ => (236.0, 38.0, compactMusicPanel)
             };
+
+            HoverPad.Visibility = next == Surface.LineMusic ? Visibility.Visible : Visibility.Collapsed;
 
             bool expanding = next is Surface.ExpandedMusic or Surface.ExpandedAmbient
                 or Surface.Peek or Surface.Notify or Surface.Shelf or Surface.Palette or Surface.Locks;
@@ -730,12 +781,38 @@ namespace Islet
             IslandContainer.Opacity = Math.Clamp(islandOpacity.Value, 0, 1);
             PlaceIsland(w);
 
+            // These views are built for their largest size and opened to less; they're made exactly
+            // as tall as the opening, so neither edge of the screen cuts into what they show
+            FitToOpening(surface switch
+            {
+                Surface.Shelf => ShelfPanel,
+                Surface.Palette => PalettePanel,
+                Surface.Locks => LocksPanel,
+                _ => null
+            });
+
             if (surface == Surface.Hidden && islandOpacity.Value < 0.02)
                 IslandContainer.IsHitTestVisible = false;
 
             PlacePrivacy();
+            PlaceQuietDot();
             ApplyShelf();
             PlaceColorPill();
+        }
+
+        // The tiny clock takes the height of the music look it follows, so the island doesn't jump in
+        // size when the music stops: 30 after the Small pill, 24 after Tiny or Line
+        (double, double, Panel?) TinyClockSize()
+        {
+            double h = Settings.MusicLook == MusicLook.Small ? 30 : 24;
+            NotchPanel.Height = h;
+            return (h == 30 ? 72.0 : 64.0, h, notchPanel);
+        }
+
+        void FitToOpening(FrameworkElement? view)
+        {
+            if (view != null && Math.Abs(view.Height - height.Target) > 0.5)
+                view.Height = height.Target;
         }
 
         static void ApplyPanel(Panel panel)
@@ -758,6 +835,8 @@ namespace Islet
         {
             bool visible = compactMusicPanel.Element.Visibility == Visibility.Visible ||
                            smallMusicPanel.Element.Visibility == Visibility.Visible ||
+                           tinyMusicPanel.Element.Visibility == Visibility.Visible ||
+                           miniMusicPanel.Element.Visibility == Visibility.Visible ||
                            expandedMusicPanel.Element.Visibility == Visibility.Visible ||
                            peekMusicPanel.Element.Visibility == Visibility.Visible;
 
@@ -802,14 +881,9 @@ namespace Islet
 
             discSpeed.Target = playing && spin ? 42 : 0;
 
-            bool disc = miniMusicPanel.Element.Visibility == Visibility.Visible;
+            // The circle while music plays shows bars now, so it doesn't spin
+            bool disc = false;
             bool orb = miniIdlePanel.Element.Visibility == Visibility.Visible && !TimerActive;
-
-            if (disc)
-            {
-                discAngle = (discAngle + discSpeed.Value * dt) % 360;
-                DiscRotate.Angle = discAngle;
-            }
 
             if (orb && !spin)
             {
@@ -851,6 +925,20 @@ namespace Islet
                            0.2 * Math.Sin(t * (8.3 + i * 0.9) + i * 2.1);
                 audioLevels[i] = (float)Math.Clamp(v, 0.05, 1);
             }
+        }
+
+        // The Line look: how far through the song, eased along once a second rather than
+        // redrawn every frame, so it costs nothing while it sits there
+        void UpdateLineProgress()
+        {
+            if (lineMusicPanel.Element.Visibility != Visibility.Visible || track == null || track.Duration <= TimeSpan.Zero)
+                return;
+
+            double fraction = Math.Clamp(track.PositionAt(DateTimeOffset.Now) / track.Duration, 0, 1);
+            double width = Math.Max(0, LineTrack.ActualWidth) * fraction;
+
+            LineProgress.BeginAnimation(WidthProperty, new System.Windows.Media.Animation.DoubleAnimation(width, TimeSpan.FromSeconds(track.Playing ? 1 : 0.3)));
+            LineProgress.Opacity = track.Playing ? 1 : 0.45;
         }
 
         bool UpdateProgress()
@@ -1134,16 +1222,44 @@ namespace Islet
                 var next = await media.GetTrackAsync();
                 bool hadTrack = track != null;
                 bool hadTitle = hadTrack && track!.Title != MediaController.UnknownTitle;
+                // A report from before the last seek would put the bar, and the lyrics, back
+                // where they were
+                if (next != null && seekedAt != default)
+                {
+                    if (track == null || next.Title != track.Title || next.PositionUpdated > seekedAt)
+                        seekedAt = default;
+                    else
+                        next = next with { Position = seekedTo, PositionUpdated = seekedAt };
+                }
+
                 track = next;
+
+                if (next == null && hadTrack && surface == Surface.ExpandedMusic && IslandContainer.IsMouseOver &&
+                    (goneSince ??= DateTime.UtcNow) > DateTime.UtcNow - TimeSpan.FromSeconds(2))
+                {
+                    // The player is between songs; the next one usually arrives within a moment.
+                    // Until then, the open island keeps showing the last one rather than changing view.
+                    _ = Dispatcher.InvokeAsync(async () =>
+                    {
+                        await Task.Delay(600);
+                        QueueTrackUpdate();
+                    });
+                    return;
+                }
+
+                if (next != null)
+                    goneSince = null;
 
                 if (next == null)
                 {
+                    goneSince = null;
                     TrackTitle.Text = "Not playing";
                     TrackArtist.Text = "Play something to get started";
                     CompactAlbumArt.Source = null;
                     SmallAlbumArt.Source = null;
                     AlbumArt.Source = null;
                     DiscArt.Fill = null;
+                    TinyArt.Fill = null;
                     playing = false;
                     pausedSince = null;
                     trackKey = "";
@@ -1234,7 +1350,10 @@ namespace Islet
             }
             catch (Exception ex)
             {
-                Log.Error("Reading the media session failed", ex);
+                if (ex is System.Runtime.InteropServices.COMException)
+                    Log.Info("The player went away mid-read: " + ex.Message);
+                else
+                    Log.Error("Reading the media session failed", ex);
                 TrackTitle.Text = "Player unavailable";
                 TrackArtist.Text = "Couldn't read what's playing";
             }
@@ -1258,6 +1377,9 @@ namespace Islet
                 return;
 
             // Spotify now and then hands Windows a song with no cover at all
+            if (!Settings.LookUpOnline)
+                return;
+
             bool appSentNone = info.Source != MediaSource.Browser && info.Artwork == null;
 
             if (!appSentNone && (!Settings.FindVideoArt || info.Source != MediaSource.Browser))
@@ -1314,6 +1436,7 @@ namespace Islet
             AlbumArt.Source = art;
             PeekArt.Source = art;
             DiscArt.Fill = art == null ? null : new ImageBrush(art) { Stretch = Stretch.UniformToFill };
+            TinyArt.Fill = DiscArt.Fill;
             ApplyAlbumTheme(art);
             UpdateCoverBackdrop();
 
@@ -1367,23 +1490,35 @@ namespace Islet
             await SeekToAsync(track.Duration * seekFraction);
         }
 
+        // Where a seek from the island went, and when: kept until the player reports a position
+        // from after it, since some (browsers especially) take a while, or never say
+        DateTimeOffset seekedAt;
+        TimeSpan seekedTo;
+
         async Task SeekToAsync(TimeSpan target)
         {
             if (track == null)
                 return;
 
             // Move the bar right away; the player confirms a moment later
-            track = track with { Position = target, PositionUpdated = DateTimeOffset.Now };
+            seekedAt = DateTimeOffset.Now;
+            seekedTo = target;
+            track = track with { Position = target, PositionUpdated = seekedAt };
             ResetLyric();
             EnsureRendering();
 
             try
             {
                 if (!await media.SeekAsync(target))
+                {
+                    // It didn't move, so its own position is the right one after all
+                    seekedAt = default;
                     Log.Info("Player refused to seek");
+                }
             }
             catch (Exception ex)
             {
+                seekedAt = default;
                 Log.Error("Seek failed", ex);
             }
         }
@@ -1431,6 +1566,31 @@ namespace Islet
         }
 
         // ================= Updates =================
+
+        // Once, the first time a new version opens: what's new in it, dropping out of the island
+        async Task SayWhatsNewAsync()
+        {
+            var current = UpdateService.CurrentVersion;
+            string? last = Settings.LastSeenVersion;
+
+            Settings.LastSeenVersion = current.ToString();
+            Settings.Save();
+
+            // A first install has nothing to compare with; a dev build may be behind what was seen
+            if (last == null || !Version.TryParse(last, out var before) || before >= current)
+                return;
+
+            var notes = await UpdateService.NotesForAsync(before, current);
+
+            Enqueue(new NotifyItem(
+                "Islet",
+                $"Updated to {current}",
+                notes.Count > 0 ? string.Join(" · ", notes.Take(2)) : "See what's new in Settings, under About.",
+                null,
+                Color.FromRgb(10, 132, 255),
+                0xE789,
+                () => OpenSettings("About")));
+        }
 
         async Task CheckForUpdatesAsync(bool announce)
         {
@@ -1492,8 +1652,10 @@ namespace Islet
             string time = now.ToString(Settings.Use24HourClock ? "HH:mm" : "h:mm");
 
             CompactTime.Text = time;
+            TinyTime.Text = time;
+            UpdateLineProgress();
             AmbientTime.Text = time;
-            AmbientDate.Text = now.ToString("dddd, MMMM d");
+            AmbientDate.Text = DateText.IslandLong(now);
 
             bool showWeather = Settings.IdleMode == IdleMode.ClockWeather && weather != null;
 
@@ -1501,7 +1663,7 @@ namespace Islet
             CompactAmbientGlyph.Visibility = showWeather ? Visibility.Visible : Visibility.Collapsed;
             CompactAmbientText.Text = showWeather
                 ? Math.Round(weather!.Temperature) + "°"
-                : now.ToString("ddd d");
+                : DateText.IslandShort(now);
 
             AmbientWeather.Visibility = weather != null ? Visibility.Visible : Visibility.Collapsed;
 
@@ -1575,31 +1737,59 @@ namespace Islet
             }
         }
 
+        // A search in the Spotify app; on the web only when the app isn't there
         void OpenSpotifySearch(string query)
         {
-            if (!string.IsNullOrWhiteSpace(query))
+            if (string.IsNullOrWhiteSpace(query))
+                return;
+
+            try
+            {
+                Process.Start(new ProcessStartInfo { FileName = "spotify:search:" + Uri.EscapeDataString(query), UseShellExecute = true });
+            }
+            catch
+            {
                 OpenUrl("https://open.spotify.com/search/" + Uri.EscapeDataString(query));
+            }
         }
 
         void OpenSpotify_Click(object sender, RoutedEventArgs e) => OpenUrl("spotify:");
 
         bool IsSpotifyTrack => track?.Source == MediaSource.Spotify || likeUri != null;
 
-        void TrackTitle_Click(object sender, MouseButtonEventArgs e)
+        // With Spotify connected, the album or artist itself opens in the app; otherwise a search
+        async void TrackTitle_Click(object sender, MouseButtonEventArgs e)
         {
             if (track == null || !IsSpotifyTrack)
                 return;
 
-            if (!string.IsNullOrWhiteSpace(track.Album))
-                OpenSpotifySearch("album:" + track.Album + " artist:" + track.Artist);
+            var info = track;
+            bool album = !string.IsNullOrWhiteSpace(info.Album);
+            string? uri = await spotifyWeb.FindAsync(album ? "album" : "track", album ? info.Album : info.Title, info.Artist);
+
+            if (uri != null)
+                OpenUrl(uri);
+            else if (album)
+                OpenSpotifySearch("album:" + info.Album + " artist:" + info.Artist);
             else
-                OpenSpotifySearch(track.Title + " " + track.Artist);
+                OpenSpotifySearch(info.Title + " " + info.Artist);
         }
 
-        void TrackArtist_Click(object sender, MouseButtonEventArgs e)
+        async void TrackArtist_Click(object sender, MouseButtonEventArgs e)
         {
-            if (track != null && IsSpotifyTrack)
-                OpenSpotifySearch("artist:" + track.Artist);
+            if (track == null || !IsSpotifyTrack)
+                return;
+
+            string artist = track.Artist;
+            OpenUrlOr(await spotifyWeb.FindAsync("artist", artist, null), () => OpenSpotifySearch("artist:" + artist));
+        }
+
+        static void OpenUrlOr(string? url, Action otherwise)
+        {
+            if (url != null)
+                OpenUrl(url);
+            else
+                otherwise();
         }
 
         async void Previous_Click(object sender, RoutedEventArgs e)
@@ -1625,7 +1815,7 @@ namespace Islet
         // while it keeps the flag, so the island ends up behind apps. Put it back on top.
         void KeepOnTop()
         {
-            if (fullscreen.ProcessName != null && Settings.ShouldHideFor(fullscreen.ProcessName))
+            if (IslandHiddenForApp())
                 return;
 
             var hwnd = new WindowInteropHelper(this).Handle;

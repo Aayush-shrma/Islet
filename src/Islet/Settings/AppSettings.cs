@@ -14,6 +14,10 @@ namespace Islet
 
     public enum IdleMode
     {
+        /// <summary>
+        /// A tiny pill with just the time. (Named for what it used to be, a camera notch;
+        /// settings are saved by name, so the name stays.)
+        /// </summary>
         Notch,
         Hide,
         Clock,
@@ -28,11 +32,36 @@ namespace Islet
         High
     }
 
+    /// <summary>How the island writes the date: the usual calendar, or Nepal's Bikram Sambat.</summary>
+    public enum NepaliDateStyle
+    {
+        Off,
+
+        /// <summary>"Kartik 29".</summary>
+        Latin,
+
+        /// <summary>"कात्तिक २९".</summary>
+        Devanagari
+    }
+
+    /// <summary>Which edge of the screen the island sits on.</summary>
+    public enum IslandEdge
+    {
+        Top,
+        Bottom
+    }
+
     public enum MusicLook
     {
         Pill,
         Disc,
-        Small
+        Small,
+
+        /// <summary>A tiny pill: a round cover and three thin bars.</summary>
+        Tiny,
+
+        /// <summary>A slim line at the top of the screen that fills as the song plays.</summary>
+        Line
     }
 
     public enum IslandTheme
@@ -79,6 +108,12 @@ namespace Islet
         public IslandSize Size { get; set; } = IslandSize.Default;
         // Where along the top it sits, as a share of the screen's width (0.5 is the middle)
         public double IslandX { get; set; } = 0.5;
+
+        /// <summary>The island's date in Nepal's calendar (Bikram Sambat), in English letters or Nepali.</summary>
+        public NepaliDateStyle NepaliDate { get; set; }
+
+        /// <summary>The top of the screen, or the bottom, just above the taskbar, growing upwards.</summary>
+        public IslandEdge IslandEdge { get; set; } = IslandEdge.Top;
         public MusicLook MusicLook { get; set; } = MusicLook.Pill;
         public PerformanceMode Performance { get; set; } = PerformanceMode.Medium;
         public bool ShowLyrics { get; set; } = true;
@@ -88,7 +123,15 @@ namespace Islet
         public bool NotifyDiscord { get; set; } = true;
         public bool NotifyWhatsApp { get; set; } = true;
         public bool NotifyMessenger { get; set; } = true;
-        public bool NotifyBrowsers { get; set; }
+
+        /// <summary>Notifications drop out of the island; off, a yellow dot beside it says some arrived.</summary>
+        public bool ShowNotifications { get; set; } = true;
+
+        /// <summary>Every other app's notifications too, not only the chat apps'.</summary>
+        public bool NotifyOtherApps { get; set; } = true;
+
+        /// <summary>Clears each notification from Windows once the island has it, so Windows' own pop-up goes.</summary>
+        public bool HideWindowsPopups { get; set; }
         public bool NotifyShowMessage { get; set; } = true;
 
         // Music sources the island follows
@@ -101,6 +144,16 @@ namespace Islet
 
         /// <summary>YouTube music videos, lyric videos and audio uploads shown and counted as the songs they are.</summary>
         public bool MusicVideosAsSongs { get; set; } = true;
+
+        /// <summary>
+        /// Covers and song checks looked up online (Deezer, iTunes): covers for music videos and
+        /// for songs sent without one, music videos confirmed as songs, the stats' missing covers.
+        /// Off, nothing of these leaves the PC.
+        /// </summary>
+        public bool LookUpOnline { get; set; } = true;
+
+        /// <summary>The version last opened, to say what's new once after an update.</summary>
+        public string? LastSeenVersion { get; set; }
 
         /// <summary>Look up covers the listening stats are missing, on Apple's iTunes catalog.</summary>
         public bool FindStatsCovers { get; set; } = true;
@@ -137,6 +190,10 @@ namespace Islet
         public int ClipboardRetentionHours { get; set; } = 168;
 
         /// <summary>Minutes away before the album art screensaver; 0 turns it off.</summary>
+        /// <summary>While you're away and music plays, the cover and lyrics fill the screen.</summary>
+        public bool ScreensaverEnabled { get; set; } = true;
+
+        /// <summary>Minutes away before the screensaver comes.</summary>
         public int ScreensaverMinutes { get; set; } = 5;
 
         // Spotify Web API
@@ -170,8 +227,18 @@ namespace Islet
             try
             {
                 if (File.Exists(FilePath))
-                    return JsonSerializer.Deserialize<AppSettings>(
-                        File.ReadAllText(FilePath), options) ?? new AppSettings();
+                {
+                    var loaded = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(FilePath), options) ?? new AppSettings();
+
+                    // Once 0 minutes meant off; now that's its own switch
+                    if (loaded.ScreensaverMinutes <= 0)
+                    {
+                        loaded.ScreensaverEnabled = false;
+                        loaded.ScreensaverMinutes = 5;
+                    }
+
+                    return loaded;
+                }
             }
             catch
             {

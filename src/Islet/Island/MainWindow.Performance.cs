@@ -71,6 +71,12 @@ namespace Islet
         {
             compactBars[i].Height = 3 + level * 17;
             smallBars[i].Height = 2 + level * 13;
+
+            if (i < tinyBars.Length)
+                tinyBars[i].Height = 1.5 + level * 9;
+
+            if (i < miniBars.Length)
+                miniBars[i].Height = 2 + level * 11;
             expandedBars[i].Height = 3.5 + level * 22;
             peekBars[i].Height = 3 + level * 17;
         }
