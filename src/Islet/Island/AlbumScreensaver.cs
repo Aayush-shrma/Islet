@@ -340,7 +340,23 @@ namespace Islet
         readonly System.Diagnostics.Stopwatch slowClock = new();
         bool hooked;
 
-        bool Moving => progress < 1 || closing || songFade > 0 || !settled;
+        bool Moving => progress < 1 || closing || songFade > 0 || !settled || LineChangeSoon();
+
+        // A line is sung a little early, so it's lit as the voice starts
+        static readonly TimeSpan LyricLead = TimeSpan.FromMilliseconds(200);
+
+        // Comfortably more than one slow step
+        static readonly TimeSpan LineAhead = TimeSpan.FromMilliseconds(400);
+
+        /// <summary>Whether the line being sung changes within the next moment.</summary>
+        bool LineChangeSoon()
+        {
+            if (laidOut is not { Count: > 0 } || shownNow is not { Track.Playing: true } playing)
+                return false;
+
+            var position = playing.Track.PositionAt(DateTimeOffset.Now) + LyricLead;
+            return LyricsService.IndexAt(laidOut, position) != LyricsService.IndexAt(laidOut, position + LineAhead);
+        }
 
         void Hook()
         {
@@ -370,6 +386,14 @@ namespace Islet
 
         void OnSlowStep()
         {
+            // The next line is close: every frame is drawn from before it starts, so the move to it
+            // begins smoothly instead of with one quarter-second leap
+            if (LineChangeSoon())
+            {
+                Hook();
+                return;
+            }
+
             double dt = Math.Min(slowClock.Elapsed.TotalSeconds, 1);
             slowClock.Restart();
             Step(dt);
@@ -473,14 +497,15 @@ namespace Islet
                 return;
 
             // The line being sung, scrolled to a little above the middle, the ones round it dimmer
-            int index = LyricsService.IndexAt(laidOut, position + TimeSpan.FromMilliseconds(200));
+            int index = LyricsService.IndexAt(laidOut, position + LyricLead);
             int focus = Math.Max(index, 0);
 
             scrollTarget = portHeight * 0.42 - (tops[focus] + heights[focus] / 2);
 
-            // A spring, nearly critically damped: it eases into each line and settles without a jolt
-            const double stiffness = 70;
-            double damping = 2 * Math.Sqrt(stiffness) * 0.92;
+            // A critically damped spring: it eases into each line and comes to rest without
+            // overshooting and drifting back
+            const double stiffness = 55;
+            double damping = 2 * Math.Sqrt(stiffness);
             int steps = Math.Max(1, (int)Math.Ceiling(dt / 0.008));
             double h = dt / steps;
 
@@ -524,7 +549,8 @@ namespace Islet
                 if (Math.Abs(glow[i] - lit) > 0.004)
                     settled = false;
 
-                glow[i] += (lit - glow[i]) * (1 - Math.Exp(-dt * 8));
+                // The finished line dims and the next brightens over about half a second
+                glow[i] += (lit - glow[i]) * (1 - Math.Exp(-dt * 5.5));
 
                 var block = blocks[i];
 
@@ -613,39 +639,58 @@ namespace Islet
 
                 title.Text = track.Title;
                 artist.Text = track.Artist;
-                cover.Source = playing.Art;
+                ShowArt(playing.Art, first);
 
-                // The old backdrop stays under the new one for a moment, and fades out
-                if (!first && backdrop.Source != null)
-                {
-                    backdropBefore.Source = backdrop.Source;
-                    backdropBefore.Opacity = 1;
-                    songFade = 1;
-                    Hook();
-                }
-
-                backdrop.Source = playing.Art != null ? MainWindow.BlurredCover(playing.Art, 240) : null;
-
-                var (primary, _) = AlbumPalette.From(playing.Art);
-                tintTarget = AlbumPalette.Tone(primary, 0.2, 0.4, 0.75);
-                var accent = AlbumPalette.Tone(primary, 0.66, 0.45, 0.95);
-                coverGlow.Color = accent;
-                barBrush.Color = Lerp(accent, Colors.White, 0.45);
-
-                if (first)
-                {
-                    tint = tintTarget;
-                    tintBrush.Color = tint;
-                }
-                else
-                {
+                if (!first)
                     FadeIn(coverFrame, title, artist);
-                }
+            }
+            else if (playing.Art != null && !ReferenceEquals(playing.Art, shownArt))
+            {
+                // The cover often arrives a moment after the song's name (looked up online, or
+                // sent late by the player): it takes its place then, rather than never
+                ShowArt(playing.Art, false);
+                FadeIn(coverFrame);
             }
 
             // The lyrics are laid out when they arrive, and again if they change
             if (!laidOutOnce || !ReferenceEquals(laidOut, playing.Lyrics))
                 LayOutLyrics(playing.Lyrics);
+        }
+
+        BitmapSource? shownArt;
+
+        // The cover, the blurred backdrop made from it, and the colours taken from it
+        void ShowArt(BitmapSource? art, bool first)
+        {
+            shownArt = art;
+            cover.Source = art;
+
+            // The old backdrop stays under the new one for a moment, and fades out
+            if (!first && backdrop.Source != null)
+            {
+                backdropBefore.Source = backdrop.Source;
+                backdropBefore.Opacity = 1;
+                songFade = 1;
+                Hook();
+            }
+
+            backdrop.Source = art != null ? MainWindow.BlurredCover(art, 240) : null;
+
+            var (primary, _) = AlbumPalette.From(art);
+            tintTarget = AlbumPalette.Tone(primary, 0.2, 0.4, 0.75);
+            var accent = AlbumPalette.Tone(primary, 0.66, 0.45, 0.95);
+            coverGlow.Color = accent;
+            barBrush.Color = Lerp(accent, Colors.White, 0.45);
+
+            if (first)
+            {
+                tint = tintTarget;
+                tintBrush.Color = tint;
+            }
+            else
+            {
+                Hook();
+            }
         }
 
         static void FadeIn(params UIElement[] parts)
