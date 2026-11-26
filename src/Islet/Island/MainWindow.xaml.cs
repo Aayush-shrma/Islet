@@ -20,6 +20,7 @@ namespace Islet
             public required FrameworkElement Element;
             public required Spring Opacity;
             public double MinScale;
+            public double Response = 0.24;
         }
 
         readonly MediaController media = new();
@@ -142,7 +143,7 @@ namespace Islet
         {
             InitializeComponent();
 
-            springs = new[] { width, height, islandOpacity, islandScale, volumeLevel, volumeRow, glow, heartScale, seekGrow, discSpeed, artPop, peekLift, openRows, dockX, dockY, grab, dragLift, dragPop, stretch, lean, backdropLevel, shelfScroll };
+            springs = new[] { width, height, islandOpacity, islandScale, volumeLevel, volumeRow, glow, heartScale, seekGrow, discSpeed, artPop, peekLift, openRows, dockX, dockY, grab, dragLift, dragPop, stretch, lean, backdropLevel, shelfScroll, mountLevel, dockArrive, sliverLevel, slotLevel, slotX, dockBlend };
 
             compactMusicPanel = AddPanel(CompactMusic, 0.88);
             smallMusicPanel = AddPanel(SmallMusic, 0.88);
@@ -163,6 +164,8 @@ namespace Islet
             shelfPanel = AddPanel(ShelfPanel, 0.9, 0.3);
             palettePanel = AddPanel(PalettePanel, 0.9, 0.3);
             locksPanel = AddPanel(LocksPanel, 0.9, 0.3);
+            dockedMusicPanel = AddPanel(DockedMusic, 0.9);
+            dockedIdlePanel = AddPanel(DockedIdle, 0.9);
 
             compactBars = CreateBars(CompactBars, 3, 1.5);
             smallBars = CreateBars(SmallBars, 2, 1);
@@ -171,6 +174,7 @@ namespace Islet
             LineProgress.Background = barBrush;
             expandedBars = CreateBars(ExpandedBars, 3.5, 1.75);
             peekBars = CreateBars(PeekBars, 3, 1.5);
+            dockedBars = CreateBars(DockedBars, 2.5, 1.5);
             ApplyOrbColor(accentColor);
             BuildLyricStage();
             trimTimer.Tick += (s, e) => TrimMemory();
@@ -179,6 +183,11 @@ namespace Islet
             fullscreen = new FullscreenWatcher(() => new WindowInteropHelper(this).Handle);
             fullscreen.Changed += OnFullscreenChanged;
             fullscreen.ForegroundChanged += KeepOnTop;
+            fullscreen.ForegroundChanged += () =>
+            {
+                if (InTaskbarMode && !TaskbarHidden)
+                    RefreshTaskbarSpansSoon(700);
+            };
             SetUpPrivacy();
             SetUpDock();
             SetUpShelf();
@@ -218,7 +227,7 @@ namespace Islet
             {
                 hoverTimer.Stop();
 
-                if (IslandContainer.IsMouseOver && !dragging && !volumeVisible && currentNotify == null && !TimerRinging)
+                if ((IslandContainer.IsMouseOver || TaskbarSliver.IsMouseOver) && !dragging && !volumeVisible && currentNotify == null && !TimerRinging)
                 {
                     hovering = true;
                     UpdateSurface();
@@ -343,7 +352,8 @@ namespace Islet
             {
                 Element = element,
                 Opacity = new Spring(0, response, 1),
-                MinScale = minScale
+                MinScale = minScale,
+                Response = response
             };
 
             element.Opacity = 0;
@@ -544,6 +554,8 @@ namespace Islet
                 StatusShowing = volumeVisible,
                 NotificationShowing = currentNotify != null,
                 PeekShowing = peekVisible,
+                Docked = DockedNow && dockFit != DockFit.None,
+                DockedHidden = TaskbarHidden,
                 IdleMode = Settings.IdleMode,
                 MusicLook = Settings.MusicLook
             });
@@ -596,10 +608,23 @@ namespace Islet
                 Surface.Locks => (380.0, LocksHeight, locksPanel),
                 Surface.ExpandedMusic => (400.0, ExpandedMusic.Height, expandedMusicPanel),
                 Surface.ExpandedAmbient => (400.0, ExpandedAmbient.Height, expandedAmbientPanel),
+                Surface.DockedMusic => (DockedSize().Width, DockedSize().Height, dockedMusicPanel),
+                Surface.DockedIdle => (DockedSize(idle: true).Width, DockedSize().Height, dockedIdlePanel),
                 _ => (236.0, 38.0, compactMusicPanel)
             };
 
             HoverPad.Visibility = next == Surface.LineMusic ? Visibility.Visible : Visibility.Collapsed;
+
+            // In the taskbar it takes the taskbar's look, as tall as its strip allows
+            bool docked = next is Surface.DockedMusic or Surface.DockedIdle;
+            dockBlend.Target = docked ? 1 : 0;
+
+            if (docked)
+            {
+                DockedMusic.Height = DockedIdle.Height = h;
+                DockedIdle.Width = DockedSize(idle: true).Width;
+                ApplyDockedTheme();
+            }
 
             bool expanding = next is Surface.ExpandedMusic or Surface.ExpandedAmbient
                 or Surface.Peek or Surface.Notify or Surface.Shelf or Surface.Palette or Surface.Locks;
@@ -628,11 +653,24 @@ namespace Islet
                 height.Configure(0.4 * quick, 0.75);
             }
 
+            // Where the shape starts from, for the new content to wait for it to grow (or shrink)
+            morphFromW = width.Value;
+            morphFromH = height.Value;
+            morphTo = active;
+
             width.Target = w;
             height.Target = h;
 
             foreach (var panel in panels)
+            {
                 panel.Opacity.Target = panel == active ? 1 : 0;
+
+                // In the smoothest mode, what's leaving goes quickly so it never overlaps what's arriving
+                if (Choreographed && panel != active)
+                    panel.Opacity.Configure(0.1, 1);
+                else
+                    panel.Opacity.Configure(panel.Response, 1);
+            }
 
             bool hidden = next == Surface.Hidden;
             islandOpacity.Target = hidden ? 0 : 1;
@@ -649,6 +687,10 @@ namespace Islet
                 Dispatcher.BeginInvoke(new Action(StartTitleMarquee), DispatcherPriority.Loaded);
             else
                 StopTitleMarquee();
+
+            // In the taskbar: a look too big for its strip (hovered open, a peek, a notification)
+            // drains up out of it to open above the taskbar, and sinks back in when it closes
+            SyncMount();
 
             EnsureRendering();
         }
@@ -733,11 +775,13 @@ namespace Islet
 
             ApplyShape();
 
+            double reveal = ContentReveal();
+
             foreach (var panel in panels)
             {
                 panel.Opacity.Step(dt);
                 busy |= !panel.Opacity.IsSettled;
-                ApplyPanel(panel);
+                ApplyPanel(panel, panel == morphTo ? reveal : 1);
             }
 
             ApplyFlair();
@@ -769,8 +813,8 @@ namespace Islet
             IslandContainer.Width = w;
             IslandContainer.Height = h;
 
-            // Full capsule when small, opening into a continuous rounded card
-            double radius = GlyphPattern.IslandRadius(w, h);
+            // Full capsule when small, opening into a continuous rounded card; in the taskbar, a button's corners
+            double radius = ApplyDockBlend(w, h);
 
             IslandShape.CornerRadius = new CornerRadius(radius);
 
@@ -815,9 +859,36 @@ namespace Islet
                 view.Height = height.Target;
         }
 
-        static void ApplyPanel(Panel panel)
+        // ================= Choreography =================
+
+        // The smoothest mode stages each change: the old content goes, the shape morphs, then the new
+        // content arrives over the last part of the morph, rather than all three at once
+        bool Choreographed => Profile.OpenStagger;
+
+        double morphFromW, morphFromH;
+        Panel? morphTo;
+
+        /// <summary>How far the new content may show: 0 while the shape has far to go, 1 near the end.</summary>
+        double ContentReveal()
         {
-            double opacity = Math.Clamp(panel.Opacity.Value, 0, 1);
+            if (!Choreographed)
+                return 1;
+
+            double span = Math.Max(Math.Abs(width.Target - morphFromW), Math.Abs(height.Target - morphFromH));
+
+            // Small changes (a volume level, a timer) need no staging
+            if (span < 24)
+                return 1;
+
+            double left = Math.Max(Math.Abs(width.Target - width.Value), Math.Abs(height.Target - height.Value));
+            double progress = Math.Clamp(1 - left / span, 0, 1);
+            double t = Math.Clamp((progress - 0.45) / 0.45, 0, 1);
+            return t * t * (3 - 2 * t);
+        }
+
+        static void ApplyPanel(Panel panel, double reveal = 1)
+        {
+            double opacity = Math.Clamp(panel.Opacity.Value, 0, 1) * reveal;
             var element = panel.Element;
 
             element.Opacity = opacity;
@@ -838,7 +909,8 @@ namespace Islet
                            tinyMusicPanel.Element.Visibility == Visibility.Visible ||
                            miniMusicPanel.Element.Visibility == Visibility.Visible ||
                            expandedMusicPanel.Element.Visibility == Visibility.Visible ||
-                           peekMusicPanel.Element.Visibility == Visibility.Visible;
+                           peekMusicPanel.Element.Visibility == Visibility.Visible ||
+                           dockedMusicPanel.Element.Visibility == Visibility.Visible;
 
             if (!visible)
                 return false;
@@ -986,6 +1058,14 @@ namespace Islet
         {
             collapseTimer.Stop();
 
+            // In the taskbar it opens by a click, like the taskbar's own buttons; hovering lights it
+            // up and shows the controls
+            if (InTaskbarMode)
+            {
+                ShowDockedHover(true);
+                return;
+            }
+
             if (!hovering && !volumeVisible)
                 hoverTimer.Start();
         }
@@ -994,6 +1074,17 @@ namespace Islet
         {
             hoverTimer.Stop();
             collapseTimer.Stop();
+            ShowDockedHover(false);
+
+            // Opened from the taskbar, it's closed by its own watch: a click elsewhere, or the pointer away a while
+            if (openedFromTaskbar)
+                return;
+
+            // Opened out of the taskbar, it stays open a while after the pointer leaves, then closes
+            // and pours back in; elsewhere it closes as quickly as the performance mode says
+            collapseTimer.Interval = hovering && InTaskbarMode
+                ? TaskbarCloseDelay
+                : TimeSpan.FromMilliseconds(Profile.CollapseDelayMs);
             collapseTimer.Start();
         }
 
@@ -1652,6 +1743,16 @@ namespace Islet
             string time = now.ToString(Settings.Use24HourClock ? "HH:mm" : "h:mm");
 
             CompactTime.Text = time;
+            // The taskbar has its own clock, so the idle button shows the weather, or just the island's mark
+            bool roomForWeather = weather != null && DockedSize(idle: true).Width >= 72;
+            DockedWeather.Visibility = roomForWeather ? Visibility.Visible : Visibility.Collapsed;
+            DockedIdleMark.Visibility = roomForWeather ? Visibility.Collapsed : Visibility.Visible;
+
+            if (weather != null)
+            {
+                DockedWeatherGlyph.Text = weather.Glyph;
+                DockedTemp.Text = Math.Round(weather.Temperature) + "°";
+            }
             TinyTime.Text = time;
             UpdateLineProgress();
             AmbientTime.Text = time;

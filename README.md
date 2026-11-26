@@ -38,7 +38,8 @@ irm https://raw.githubusercontent.com/Prathambist/Islet/main/uninstall.ps1 | iex
 
 **The island**
 - **Views:** a pill, a circle, a small pill, a tiny pill or a slim line while music plays; a clock, weather, a tiny clock or a circle when it's idle.
-- **Top or bottom:** hold the island for a second and drag it anywhere along either edge. At the bottom it rises above the taskbar, even one that hides itself.
+- **Top, bottom or in the taskbar:** hold the island for a second and drag it anywhere along either edge, or into the taskbar. At the bottom it rises above the taskbar, even one that hides itself.
+- **In the taskbar:** it sits in the taskbar like one of its buttons, in a free gap and never over your app icons (it shrinks to fit, or moves just above the taskbar when there's no room). Hover for play, pause and skip; click it or its **^** to open the full card above the taskbar, and click anywhere else to close it. It slides away with an auto-hiding taskbar, and a new song still pops up to be seen.
 - **Nepali date:** Bikram Sambat in English letters or Nepali (कात्तिक २९).
 - **Right-click menu:** the song, the timer, and moving the island, a click away.
 - **Hides over full-screen apps:** games and videos.
@@ -51,6 +52,7 @@ irm https://raw.githubusercontent.com/Prathambist/Islet/main/uninstall.ps1 | iex
 - **Timer and focus sessions:** 25 minutes in which messages wait, then arrive together.
 - **File shelf:** drop files on the island and drag them out later. New screenshots land there too.
 - **Colour picker:** pick any colour on screen; its hex code is copied.
+- **Clipboard history:** text you copy, searchable and a click away from being copied again, from the tray icon. Pin what you want to keep; the rest goes after a week (or however long you choose). Stored encrypted for your Windows account only.
 - **Files in use:** drag a file Windows won't delete onto the island to see which app has it open.
 
 Everything is set in **Settings**, from the island's right-click menu or the tray icon.

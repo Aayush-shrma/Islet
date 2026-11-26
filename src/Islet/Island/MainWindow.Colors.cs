@@ -355,14 +355,26 @@ namespace Islet
             bool privacyLeft = privacyShown && Left + islandLeft + w / 2 > ScreenWidth * 0.75;
             double privacyWidth = privacyShown ? PrivacyPill.Width + gap : 0;
 
-            double left = visualRight + gap + (privacyShown && !privacyLeft ? privacyWidth : 0);
+            // The shelf's badge goes on the right too when there's no room on the left (near the screen's
+            // left side), so the column then starts past it instead of on top of it
+            bool shelfShown = ShelfPill.Visibility == Visibility.Visible;
+            double shelfWidth = shelfShown ? (ShelfPill.ActualWidth > 0 ? ShelfPill.ActualWidth : 34) + gap : 0;
+            bool shelfRight = shelfShown && ShelfPill.Margin.Left > visualLeft;
+
+            double left = visualRight + gap + (privacyShown && !privacyLeft ? privacyWidth : 0) + (shelfRight ? shelfWidth : 0);
             bool onRight = true;
 
             if (left + column > Width - 2)
             {
-                double shelfWidth = ShelfPill.Visibility == Visibility.Visible ? ShelfPill.ActualWidth + gap : 0;
-                left = visualLeft - gap - column - (privacyLeft ? privacyWidth : 0) - shelfWidth;
+                left = visualLeft - gap - column - (privacyLeft ? privacyWidth : 0) - (shelfRight ? 0 : shelfWidth);
                 onRight = false;
+
+                // No room either side: kept in the window, past everything on the right, rather than cut off
+                if (left < 2)
+                {
+                    left = Math.Min(Width - 2 - column, visualRight + gap + (privacyShown && !privacyLeft ? privacyWidth : 0) + (shelfRight ? shelfWidth : 0));
+                    onRight = true;
+                }
             }
 
             // Centred on the island's row; kept on screen when the island is shorter than the stack

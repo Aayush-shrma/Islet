@@ -19,6 +19,7 @@ namespace Islet
         const byte TintAlpha = 45;
 
         readonly Border centreMark;
+        readonly Border slot;
         readonly Func<IntPtr> island;
         IntPtr hwnd;
 
@@ -57,9 +58,20 @@ namespace Islet
                 Margin = new Thickness(0, 58, 0, 0)
             };
 
+            slot = new Border
+            {
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Top,
+                BorderBrush = new SolidColorBrush(Color.FromArgb(220, 255, 255, 255)),
+                BorderThickness = new Thickness(1.5),
+                Background = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255)),
+                Visibility = Visibility.Collapsed
+            };
+
             var root = new Grid();
             root.Children.Add(strip);
             root.Children.Add(centreMark);
+            root.Children.Add(slot);
             Content = root;
 
             ShowCentre(false);
@@ -87,6 +99,30 @@ namespace Islet
         public void Prepare() => new WindowInteropHelper(this).EnsureHandle();
 
         public void ShowCentre(bool snapped) => centreMark.Opacity = snapped ? 1 : 0.3;
+
+        /// <summary>
+        /// Outlines where the island will land in the taskbar (in screen units), growing in from a
+        /// little smaller as it shows; null hides it.
+        /// </summary>
+        public void SetSlot(Rect? place, double level, double radius)
+        {
+            if (place is not { } r || level < 0.01)
+            {
+                if (slot.Visibility != Visibility.Collapsed)
+                    slot.Visibility = Visibility.Collapsed;
+
+                return;
+            }
+
+            double shrink = 6 * (1 - level);
+
+            slot.Visibility = Visibility.Visible;
+            slot.Opacity = level;
+            slot.Width = Math.Max(1, r.Width - shrink * 2);
+            slot.Height = Math.Max(1, r.Height - shrink);
+            slot.CornerRadius = new CornerRadius(Math.Min(radius, slot.Height / 2));
+            slot.Margin = new Thickness(r.Left + shrink, r.Top + shrink / 2, 0, 0);
+        }
 
         /// <summary>0 hides it, 1 is fully dimmed.</summary>
         public void SetLevel(double level)

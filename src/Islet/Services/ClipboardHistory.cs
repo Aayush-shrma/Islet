@@ -23,8 +23,12 @@ namespace Islet
     /// Saved to clipboard.dat in Islet's folder, encrypted for the current Windows user
     /// (DPAPI), so it survives restarts but can't be read from another account.
     /// The clock is passed in, so expiry is easy to test.
+    ///
+    /// Writing the file means encrypting the whole history, which can be large, so it isn't done
+    /// on every change: it happens on a background thread a moment after the last one, and at
+    /// once on <see cref="Flush"/> (when Islet closes).
     /// </summary>
-    public sealed class ClipboardHistory
+    public sealed class ClipboardHistory : IDisposable
     {
         /// <summary>Unpinned entries kept at most; the oldest go first.</summary>
         public const int MaxItems = 500;
@@ -32,14 +36,30 @@ namespace Islet
         /// <summary>Longer copies (a whole file, a log) aren't kept.</summary>
         public const int MaxLength = 100_000;
 
+        /// <summary>How long after the last change the file is written.</summary>
+        public static readonly TimeSpan DefaultSaveDelay = TimeSpan.FromSeconds(1);
+
         readonly string folder;
         readonly Func<DateTime> now;
         readonly List<ClipboardEntry> items = new();
 
-        public ClipboardHistory(string folder, Func<DateTime>? utcNow = null)
+        readonly TimeSpan saveDelay;
+        readonly Timer saveTimer;
+
+        // The history as it should be written, waiting for the timer; null when the file is up to date
+        List<ClipboardEntry>? unsaved;
+        readonly object unsavedLock = new();
+
+        // One write at a time, so an older version can never land after a newer one
+        readonly object writeLock = new();
+
+        /// <param name="saveDelay">How long after a change the file is written; infinite waits for <see cref="Flush"/>.</param>
+        public ClipboardHistory(string folder, Func<DateTime>? utcNow = null, TimeSpan? saveDelay = null)
         {
             this.folder = folder;
             now = utcNow ?? (() => DateTime.UtcNow);
+            this.saveDelay = saveDelay ?? DefaultSaveDelay;
+            saveTimer = new Timer(_ => Flush());
             Load();
         }
 
@@ -162,25 +182,66 @@ namespace Islet
 
         void SaveAndNotify()
         {
-            try
+            // Entries are changed in place (pinned, copied again), so the save gets copies of them
+            // as they are now; the texts themselves are shared, not copied
+            var snapshot = items.ConvertAll(e => new ClipboardEntry
             {
-                Directory.CreateDirectory(folder);
+                Id = e.Id,
+                Text = e.Text,
+                CopiedAt = e.CopiedAt,
+                Pinned = e.Pinned
+            });
 
-                if (items.Count == 0)
-                {
-                    File.Delete(FilePath);
-                }
-                else
-                {
-                    byte[] plain = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(items));
-                    File.WriteAllBytes(FilePath, ProtectedData.Protect(plain, null, DataProtectionScope.CurrentUser));
-                }
-            }
-            catch
-            {
-            }
+            lock (unsavedLock)
+                unsaved = snapshot;
+
+            // Each change pushes the write back, so a burst of copies is written once
+            saveTimer.Change(saveDelay, Timeout.InfiniteTimeSpan);
 
             Changed?.Invoke();
+        }
+
+        /// <summary>Writes any change that's still waiting, now.</summary>
+        public void Flush()
+        {
+            lock (writeLock)
+            {
+                List<ClipboardEntry>? snapshot;
+
+                lock (unsavedLock)
+                {
+                    snapshot = unsaved;
+                    unsaved = null;
+                }
+
+                if (snapshot == null)
+                    return;
+
+                try
+                {
+                    Directory.CreateDirectory(folder);
+
+                    if (snapshot.Count == 0)
+                    {
+                        File.Delete(FilePath);
+                    }
+                    else
+                    {
+                        byte[] plain = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(snapshot));
+                        File.WriteAllBytes(FilePath, ProtectedData.Protect(plain, null, DataProtectionScope.CurrentUser));
+                    }
+                }
+                catch
+                {
+                }
+            }
+        }
+
+        /// <summary>Stops the timer and writes what's waiting.</summary>
+        public void Dispose()
+        {
+            saveTimer.Dispose();
+            Flush();
         }
 
         /// <summary>

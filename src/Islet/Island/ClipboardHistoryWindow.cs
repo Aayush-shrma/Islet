@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace Islet
 {
@@ -21,12 +22,17 @@ namespace Islet
 
         readonly ClipboardHistory history;
         readonly TextBox search = new();
-        readonly StackPanel list = new();
+        readonly EntryList list;
         readonly TextBlock status = new();
+
+        // Searching every entry's whole text waits until typing pauses, rather than going on every key
+        readonly DispatcherTimer searchPause = new() { Interval = TimeSpan.FromMilliseconds(120) };
 
         public ClipboardHistoryWindow(ClipboardHistory history)
         {
             this.history = history;
+            list = new EntryList(EntryRow);
+            searchPause.Tick += (s, e) => Build(keepScroll: false);
 
             Title = "Islet clipboard history";
             Width = 440;
@@ -48,7 +54,11 @@ namespace Islet
             search.CaretBrush = TextBrush;
             search.BorderThickness = new Thickness(0);
             search.ToolTip = "Search your clipboard history";
-            search.TextChanged += (s, e) => Build();
+            search.TextChanged += (s, e) =>
+            {
+                searchPause.Stop();
+                searchPause.Start();
+            };
             search.PreviewKeyDown += (s, e) =>
             {
                 if (e.Key == Key.Enter && history.Search(search.Text).FirstOrDefault() is ClipboardEntry first)
@@ -90,12 +100,7 @@ namespace Islet
             DockPanel.SetDock(footer, Dock.Bottom);
             root.Children.Add(footer);
 
-            root.Children.Add(new ScrollViewer
-            {
-                Content = list,
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
-            });
+            root.Children.Add(list);
 
             Content = root;
 
@@ -106,9 +111,13 @@ namespace Islet
             };
 
             history.Changed += OnChanged;
-            Closed += (s, e) => history.Changed -= OnChanged;
+            Closed += (s, e) =>
+            {
+                searchPause.Stop();
+                history.Changed -= OnChanged;
+            };
 
-            Build();
+            Build(keepScroll: false);
         }
 
         public void FocusSearch()
@@ -117,11 +126,13 @@ namespace Islet
             search.SelectAll();
         }
 
-        void OnChanged() => Dispatcher.BeginInvoke(new Action(Build));
+        // Pinning, deleting or a new copy shows at once, and the list stays where it was scrolled to
+        void OnChanged() => Dispatcher.BeginInvoke(new Action(() => Build(keepScroll: true)));
 
-        void Build()
+        void Build(bool keepScroll)
         {
-            list.Children.Clear();
+            searchPause.Stop();
+            double offset = list.Scroller?.VerticalOffset ?? 0;
             var matches = history.Search(search.Text);
 
             status.Text = history.Items.Count == 0
@@ -130,8 +141,57 @@ namespace Islet
                     ? $"{matches.Count} of {history.Items.Count}"
                     : $"{history.Items.Count} item{(history.Items.Count == 1 ? "" : "s")}";
 
-            foreach (var entry in matches.Take(200))
-                list.Children.Add(EntryRow(entry));
+            // Only the rows in view are made, so there's no need to stop at a few hundred
+            list.ItemsSource = matches;
+
+            if (keepScroll)
+                Dispatcher.BeginInvoke(new Action(() => list.Scroller?.ScrollToVerticalOffset(offset)), DispatcherPriority.Loaded);
+            else
+                list.Scroller?.ScrollToTop();
+        }
+
+        /// <summary>
+        /// The entries, with a row made only for those scrolled into view (and reused as others
+        /// scroll in), so opening the window and searching stay quick however much is kept.
+        /// Scrolling still goes by pixels rather than jumping a whole row at a time.
+        /// </summary>
+        sealed class EntryList : ItemsControl
+        {
+            readonly Func<ClipboardEntry, FrameworkElement> row;
+
+            public ScrollViewer? Scroller { get; private set; }
+
+            public EntryList(Func<ClipboardEntry, FrameworkElement> row)
+            {
+                this.row = row;
+
+                VirtualizingPanel.SetIsVirtualizing(this, true);
+                VirtualizingPanel.SetVirtualizationMode(this, VirtualizationMode.Recycling);
+                VirtualizingPanel.SetScrollUnit(this, ScrollUnit.Pixel);
+                ItemsPanel = new ItemsPanelTemplate(new FrameworkElementFactory(typeof(VirtualizingStackPanel)));
+
+                // The list has to scroll itself: inside an outer ScrollViewer every row would be made
+                var scroll = new FrameworkElementFactory(typeof(ScrollViewer), "Scroll");
+                scroll.SetValue(ScrollViewer.CanContentScrollProperty, true);
+                scroll.SetValue(ScrollViewer.VerticalScrollBarVisibilityProperty, ScrollBarVisibility.Auto);
+                scroll.SetValue(ScrollViewer.HorizontalScrollBarVisibilityProperty, ScrollBarVisibility.Disabled);
+                scroll.AppendChild(new FrameworkElementFactory(typeof(ItemsPresenter)));
+                Template = new ControlTemplate(typeof(ItemsControl)) { VisualTree = scroll };
+            }
+
+            public override void OnApplyTemplate()
+            {
+                base.OnApplyTemplate();
+                Scroller = GetTemplateChild("Scroll") as ScrollViewer;
+            }
+
+            protected override void PrepareContainerForItemOverride(DependencyObject element, object item)
+            {
+                base.PrepareContainerForItemOverride(element, item);
+
+                if (element is ContentPresenter presenter && item is ClipboardEntry entry)
+                    presenter.Content = row(entry);
+            }
         }
 
         FrameworkElement EntryRow(ClipboardEntry entry)

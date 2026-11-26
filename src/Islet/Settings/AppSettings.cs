@@ -48,7 +48,10 @@ namespace Islet
     public enum IslandEdge
     {
         Top,
-        Bottom
+        Bottom,
+
+        /// <summary>In the taskbar's own strip, moving with it; at the bottom edge when the taskbar isn't along the bottom.</summary>
+        Taskbar
     }
 
     public enum MusicLook

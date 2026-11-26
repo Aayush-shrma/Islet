@@ -65,6 +65,10 @@ namespace Islet
             }
         }
 
+        // The app last found full screen, so it's looked up once rather than on every poll
+        uint describedPid;
+        (string Process, string Display)? described;
+
         void Poll()
         {
             string? process = null;
@@ -75,10 +79,26 @@ namespace Islet
                 var hwnd = DetectFullscreenWindow();
 
                 if (hwnd != IntPtr.Zero)
-                    (process, display) = DescribeProcess(hwnd);
+                {
+                    GetWindowThreadProcessId(hwnd, out uint pid);
+
+                    if (described == null || pid != describedPid)
+                    {
+                        describedPid = pid;
+                        described = DescribeProcess(pid);
+                    }
+
+                    (process, display) = described.Value;
+                }
+                else
+                {
+                    // Forgotten once nothing is full screen, so a reused process ID can't be mistaken for it
+                    described = null;
+                }
             }
             catch
             {
+                described = null;
             }
 
             if (process == ProcessName)
@@ -156,24 +176,28 @@ namespace Islet
             return IntPtr.Zero;
         }
 
-        static (string Process, string Display) DescribeProcess(IntPtr hwnd)
+        static (string Process, string Display) DescribeProcess(uint pid)
         {
-            GetWindowThreadProcessId(hwnd, out uint pid);
+            string name;
 
-            using var process = Process.GetProcessById((int)pid);
-            string name = process.ProcessName;
+            using (var process = Process.GetProcessById((int)pid))
+                name = process.ProcessName;
+
             string display = name;
 
             try
             {
-                var description = process.MainModule?.FileVersionInfo.FileDescription;
+                if (ProcessImage.PathOf((int)pid) is { } path)
+                {
+                    var description = FileVersionInfo.GetVersionInfo(path).FileDescription;
 
-                if (!string.IsNullOrWhiteSpace(description))
-                    display = description.Trim();
+                    if (!string.IsNullOrWhiteSpace(description))
+                        display = description.Trim();
+                }
             }
             catch
             {
-                // Elevated or protected processes cannot be inspected
+                // Protected processes cannot be inspected; the name still says enough
             }
 
             return (name, display);

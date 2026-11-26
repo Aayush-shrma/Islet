@@ -109,12 +109,38 @@ namespace Islet
             }
         }
 
+        // Made once on a background thread and kept, rather than made again on every check
+        MMDeviceEnumerator? devices;
+
+        // Names of the running processes, taken at most once per check and only if needed
+        HashSet<string>? running;
+
+        // Registry entries, with their start time, whose app was found gone: a use that never wrote
+        // its stop time (the app crashed). Starting to use the mic again writes a new start time.
+        readonly HashSet<(string Key, long Start)> ended = new();
+
         PrivacyUse Read()
         {
-            var microphone = Recorded("microphone");
-            microphone.UnionWith(RecordingApps());
+            running = null;
 
-            return new PrivacyUse(microphone.ToList(), Recorded("webcam").ToList());
+            try
+            {
+                var microphone = Recorded("microphone");
+                microphone.UnionWith(RecordingApps());
+
+                return new PrivacyUse(microphone.ToList(), Recorded("webcam").ToList());
+            }
+            catch
+            {
+                // A device that went away can leave the enumerator unusable; start over next time
+                devices?.Dispose();
+                devices = null;
+                throw;
+            }
+            finally
+            {
+                running = null;
+            }
         }
 
         void Update(PrivacyUse next)
@@ -130,7 +156,7 @@ namespace Islet
         List<string> RecordingApps()
         {
             var names = new List<string>();
-            using var devices = new MMDeviceEnumerator();
+            devices ??= new MMDeviceEnumerator();
 
             foreach (var device in devices.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active))
             {
@@ -158,19 +184,14 @@ namespace Islet
 
         static string? ProcessPath(int pid)
         {
+            if (ProcessImage.PathOf(pid) is { } path)
+                return path;
+
             try
             {
+                // Protected processes can't be inspected; the name still says enough
                 using var process = Process.GetProcessById(pid);
-
-                try
-                {
-                    return process.MainModule?.FileName ?? process.ProcessName;
-                }
-                catch
-                {
-                    // Elevated or protected processes can't be inspected; the name still says enough
-                    return process.ProcessName;
-                }
+                return process.ProcessName;
             }
             catch
             {
@@ -207,14 +228,27 @@ namespace Islet
                 {
                     using var key = desktop.OpenSubKey(name);
 
-                    if (key == null || !IsInUse(key))
+                    if (key == null)
+                        continue;
+
+                    long start = ToLong(key.GetValue("LastUsedTimeStart"));
+
+                    if (!IsInUse(start, ToLong(key.GetValue("LastUsedTimeStop"))))
+                        continue;
+
+                    var use = (capability + "|" + name, start);
+
+                    if (ended.Contains(use))
                         continue;
 
                     string path = ExePath(name);
 
                     // An app that crashed mid-call never writes its stop time; don't show a dot for it forever
                     if (!IsRunning(path))
+                    {
+                        ended.Add(use);
                         continue;
+                    }
 
                     names.Add(Describe(path));
                 }
@@ -233,15 +267,20 @@ namespace Islet
             _ => 0
         };
 
-        static bool IsRunning(string path)
+        bool IsRunning(string path)
         {
-            var processes = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(path));
-            bool running = processes.Length > 0;
+            if (running == null)
+            {
+                running = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var process in processes)
-                process.Dispose();
+                foreach (var process in Process.GetProcesses())
+                {
+                    using (process)
+                        running.Add(process.ProcessName);
+                }
+            }
 
-            return running;
+            return running.Contains(Path.GetFileNameWithoutExtension(path));
         }
 
         // "Discord.exe" → "Discord", "brave.exe" → "Brave Browser", from the file's own description

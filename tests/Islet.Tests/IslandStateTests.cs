@@ -25,6 +25,51 @@ namespace Islet.Tests
         public void IdleShowsTheChosenIdleLook(IdleMode mode, Surface expected) =>
             Assert.Equal(expected, IslandState.Choose(new IslandInputs { Idle = true, IdleMode = mode }));
 
+        [Theory]
+        [InlineData(MusicLook.Pill)]
+        [InlineData(MusicLook.Tiny)]
+        [InlineData(MusicLook.Line)]
+        public void DockedItHasOneLookForMusicWhicheverIsChosen(MusicLook look)
+        {
+            var docked = Playing with { Docked = true, MusicLook = look };
+
+            Assert.Equal(Surface.DockedMusic, IslandState.Choose(docked));
+
+            // The title is already showing, so a new song doesn't peek
+            Assert.Equal(Surface.DockedMusic, IslandState.Choose(docked with { PeekShowing = true }));
+        }
+
+        [Fact]
+        public void DockedInAHiddenTaskbarANewSongPeeksAndOtherwiseItKeepsItsLook()
+        {
+            var hidden = Playing with { Docked = true, DockedHidden = true };
+
+            // Same look while the taskbar is away, so it doesn't change shape (or place) as it comes and goes
+            Assert.Equal(Surface.DockedMusic, IslandState.Choose(hidden));
+            Assert.Equal(Surface.DockedIdle, IslandState.Choose(new IslandInputs { Idle = true, Docked = true, DockedHidden = true }));
+
+            // But a new song comes up to be seen
+            Assert.Equal(Surface.Peek, IslandState.Choose(hidden with { PeekShowing = true }));
+        }
+
+        [Theory]
+        [InlineData(IdleMode.Notch)]
+        [InlineData(IdleMode.Circle)]
+        [InlineData(IdleMode.Clock)]
+        public void DockedItHasOneLookForIdleWhicheverIsChosen(IdleMode mode) =>
+            Assert.Equal(Surface.DockedIdle, IslandState.Choose(new IslandInputs { Idle = true, IdleMode = mode, Docked = true }));
+
+        [Fact]
+        public void DockedItStillHidesWhenIdleIsSetToHide() =>
+            Assert.Equal(Surface.Hidden, IslandState.Choose(new IslandInputs { Idle = true, IdleMode = IdleMode.Hide, Docked = true }));
+
+        [Fact]
+        public void DockedItStillOpensForHoverAndNotifications()
+        {
+            Assert.Equal(Surface.ExpandedMusic, IslandState.Choose(Playing with { Docked = true, Hovering = true }));
+            Assert.Equal(Surface.Notify, IslandState.Choose(Playing with { Docked = true, NotificationShowing = true }));
+        }
+
         [Fact]
         public void TheTinyLooksShowWhileMusicPlays()
         {

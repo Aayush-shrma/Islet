@@ -110,8 +110,10 @@ namespace Islet
                 out performanceNote);
 
             var position = Group("Position");
-            ChoiceRow(position, "Edge", "At the bottom it sits above the taskbar and opens upwards.",
-                new[] { "Top", "Bottom" },
+            ChoiceRow(position, "Edge",
+                "At the bottom it sits above the taskbar and opens upwards. In the taskbar it sits in the taskbar itself " +
+                "and slides away with it when it hides; notifications still come up to be seen. Drag it to an empty part of the taskbar.",
+                new[] { "Top", "Bottom", "In the taskbar" },
                 (int)Settings.IslandEdge,
                 i => { Settings.IslandEdge = (IslandEdge)i; Settings.Save(); });
             Row(position, "Where it sits", "Hold the island for a second, then drag it anywhere along the top or bottom.",

@@ -42,6 +42,10 @@ namespace Islet
             bool atTop = Settings.IslandEdge == IslandEdge.Top;
             MenuEdge.Header = atTop ? "Move to the bottom" : "Move to the top";
             MenuEdgeGlyph.Text = atTop ? "\uE74B" : "\uE74A";
+
+            // Only where there's a taskbar along the bottom to dock in
+            MenuTaskbar.IsChecked = Settings.IslandEdge == IslandEdge.Taskbar;
+            MenuTaskbar.Visibility = ReadTaskbarBand() != null ? Visibility.Visible : Visibility.Collapsed;
             MenuCentre.Visibility = Math.Abs(Settings.IslandX - 0.5) > 0.01 ? Visibility.Visible : Visibility.Collapsed;
         }
 
@@ -138,6 +142,13 @@ namespace Islet
         void MenuEdge_Click(object sender, RoutedEventArgs e)
         {
             Settings.IslandEdge = Settings.IslandEdge == IslandEdge.Top ? IslandEdge.Bottom : IslandEdge.Top;
+            Settings.Save();
+        }
+
+        // Docked: into the taskbar's strip. Undocked: just above the taskbar, where it sits at the bottom edge
+        void MenuTaskbar_Click(object sender, RoutedEventArgs e)
+        {
+            Settings.IslandEdge = Settings.IslandEdge == IslandEdge.Taskbar ? IslandEdge.Bottom : IslandEdge.Taskbar;
             Settings.Save();
         }
 

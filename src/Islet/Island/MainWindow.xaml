@@ -389,6 +389,11 @@
                             <TextBlock x:Name="MenuEdgeGlyph" Text="&#xE74B;" Style="{StaticResource MenuGlyph}"/>
                         </MenuItem.Icon>
                     </MenuItem>
+                    <MenuItem x:Name="MenuTaskbar" Header="Dock in the taskbar" IsCheckable="True" Click="MenuTaskbar_Click">
+                        <MenuItem.Icon>
+                            <TextBlock Text="&#xE90C;" Style="{StaticResource MenuGlyph}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
                     <MenuItem x:Name="MenuCentre" Header="Move to the centre" Click="MenuCentre_Click">
                         <MenuItem.Icon>
                             <TextBlock Text="&#xE8E3;" Style="{StaticResource MenuGlyph}"/>
@@ -418,6 +423,13 @@
             <Border x:Name="IslandShape"
                     Background="Black"
                     CornerRadius="19"/>
+
+            <!-- Resting in the taskbar: a soft tint like a hovered taskbar button instead of the solid
+                 island, faded in over it (colours set for the taskbar's light or dark theme) -->
+            <Border x:Name="DockedShape"
+                    Opacity="0"
+                    BorderThickness="1"
+                    IsHitTestVisible="False"/>
 
             <Grid x:Name="IslandContent">
 
@@ -712,6 +724,152 @@
                                    FontWeight="Medium"
                                    VerticalAlignment="Center"/>
                     </StackPanel>
+                </Grid>
+
+                <!-- ===== In the taskbar: music, like a taskbar button ===== -->
+                <!-- A click on it opens the island above the taskbar; hovering swaps the bars for the controls -->
+                <Grid x:Name="DockedMusic"
+                      Width="248"
+                      Height="40"
+                      Background="Transparent"
+                      HorizontalAlignment="Center"
+                      VerticalAlignment="Top"
+                      RenderTransformOrigin="0.5,0.5"
+                      MouseLeftButtonUp="Docked_Click">
+                    <Grid.RenderTransform>
+                        <ScaleTransform/>
+                    </Grid.RenderTransform>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Width="28"
+                            Height="28"
+                            Margin="6,0,0,0"
+                            CornerRadius="5"
+                            Background="#1C1C1E"
+                            VerticalAlignment="Center">
+                        <Border.Clip>
+                            <RectangleGeometry Rect="0,0,28,28" RadiusX="5" RadiusY="5"/>
+                        </Border.Clip>
+                        <Image Source="{Binding Source, ElementName=CompactAlbumArt}"
+                               Stretch="UniformToFill"/>
+                    </Border>
+
+                    <StackPanel x:Name="DockedText"
+                                Grid.Column="1"
+                                Margin="9,0,6,0"
+                                VerticalAlignment="Center">
+                        <TextBlock x:Name="DockedTitle"
+                                   Text="{Binding Text, ElementName=TrackTitle}"
+                                   Foreground="White"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis"/>
+                        <TextBlock x:Name="DockedArtist"
+                                   Text="{Binding Text, ElementName=TrackArtist}"
+                                   Foreground="#99FFFFFF"
+                                   FontSize="11"
+                                   Margin="0,1,0,0"
+                                   TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+
+                    <Grid x:Name="DockedRight"
+                          Grid.Column="2"
+                          VerticalAlignment="Center">
+                        <StackPanel x:Name="DockedBars"
+                                    Orientation="Horizontal"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    Height="18"
+                                    Margin="0,0,6,0"/>
+
+                        <StackPanel x:Name="DockedControls"
+                                    Orientation="Horizontal"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    Opacity="0"
+                                    IsHitTestVisible="False">
+                            <Button x:Name="DockedPrevious"
+                                    Content="&#xE892;"
+                                    Click="Previous_Click"
+                                    Style="{StaticResource IconButton}"
+                                    Width="26"
+                                    Height="26"
+                                    FontSize="11"
+                                    ToolTip="Previous"/>
+                            <Button x:Name="DockedPlayPause"
+                                    Content="{Binding Content, ElementName=PlayPauseButton}"
+                                    Click="PlayPause_Click"
+                                    Style="{StaticResource IconButton}"
+                                    Width="28"
+                                    Height="28"
+                                    FontSize="13"/>
+                            <Button x:Name="DockedNext"
+                                    Content="&#xE893;"
+                                    Click="Next_Click"
+                                    Style="{StaticResource IconButton}"
+                                    Width="26"
+                                    Height="26"
+                                    FontSize="11"
+                                    ToolTip="Next"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Button x:Name="DockedExpand"
+                            Grid.Column="3"
+                            Content="&#xE70E;"
+                            Click="DockedExpand_Click"
+                            Style="{StaticResource IconButton}"
+                            Width="22"
+                            Height="30"
+                            FontSize="10"
+                            Margin="0,0,3,0"
+                            Opacity="0.55"
+                            ToolTip="Open"/>
+                </Grid>
+
+                <!-- ===== In the taskbar: idle, a small button: the weather, or the island's own mark ===== -->
+                <Grid x:Name="DockedIdle"
+                      Width="48"
+                      Height="40"
+                      Background="Transparent"
+                      HorizontalAlignment="Center"
+                      VerticalAlignment="Top"
+                      RenderTransformOrigin="0.5,0.5"
+                      MouseLeftButtonUp="Docked_Click">
+                    <Grid.RenderTransform>
+                        <ScaleTransform/>
+                    </Grid.RenderTransform>
+
+                    <StackPanel x:Name="DockedWeather"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center">
+                        <TextBlock x:Name="DockedWeatherGlyph"
+                                   FontFamily="{StaticResource IconFont}"
+                                   Foreground="#FFD60A"
+                                   FontSize="13"
+                                   Margin="0,1,5,0"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock x:Name="DockedTemp"
+                                   Foreground="White"
+                                   FontSize="12.5"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <Border x:Name="DockedIdleMark"
+                            Width="18"
+                            Height="7"
+                            CornerRadius="3.5"
+                            Background="White"
+                            Opacity="0.85"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"/>
                 </Grid>
 
                 <!-- ===== Compact: volume pill ===== -->
@@ -1921,6 +2079,30 @@
                      Fill="#FF9500"
                      Stroke="Black"
                      StrokeThickness="1"/>
+        </Border>
+
+        <!-- Docked in a taskbar that has hidden itself: a thin glowing line at the screen's bottom where
+             the island went, which opens it when hovered. The near-clear fill gives it a taller hit area. -->
+        <Border x:Name="TaskbarSliver"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Top"
+                Height="9"
+                Background="#01000000"
+                Visibility="Collapsed"
+                MouseEnter="Island_MouseEnter"
+                MouseLeave="Island_MouseLeave">
+            <Border Height="3"
+                    VerticalAlignment="Bottom"
+                    CornerRadius="1.5">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                        <GradientStop Color="#00FFFFFF" Offset="0"/>
+                        <GradientStop Color="#E6FFFFFF" Offset="0.3"/>
+                        <GradientStop Color="#E6FFFFFF" Offset="0.7"/>
+                        <GradientStop Color="#00FFFFFF" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+            </Border>
         </Border>
 
         <Border x:Name="PrivacyLabel"

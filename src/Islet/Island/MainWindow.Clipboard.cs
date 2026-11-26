@@ -28,6 +28,9 @@ namespace Islet
             {
                 clipboardPruneTimer.Stop();
                 StopClipboardListener();
+
+                // The last copies may still be waiting to be written
+                clipboardHistory.Dispose();
             };
         }
 

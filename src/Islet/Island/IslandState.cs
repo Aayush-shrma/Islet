@@ -22,7 +22,9 @@ namespace Islet
         Palette,
         Locks,
         TinyMusic,
-        LineMusic
+        LineMusic,
+        DockedMusic,
+        DockedIdle
     }
 
     /// <summary>Everything that decides which shape the island takes, at one moment.</summary>
@@ -49,6 +51,12 @@ namespace Islet
 
         /// <summary>The next song's title, briefly, as it starts.</summary>
         public bool PeekShowing { get; init; }
+
+        /// <summary>Sitting in the taskbar: one look of its own there, for music and idle alike.</summary>
+        public bool Docked { get; init; }
+
+        /// <summary>Docked, but the taskbar has slid away with it, so a new song's peek comes up to be seen.</summary>
+        public bool DockedHidden { get; init; }
 
         public IdleMode IdleMode { get; init; } = IdleMode.Notch;
         public MusicLook MusicLook { get; init; } = MusicLook.Pill;
@@ -97,6 +105,12 @@ namespace Islet
                 return i.TimerActive ? Surface.TimerPill : Surface.Hidden;
 
             // The tiny looks have no room for a timer, so while one runs they make way for a shape that has
+            // In the taskbar the song's title is always showing, so a new one needs no peek
+            if (i.Docked && !(i.DockedHidden && i.PeekShowing && !i.Idle))
+                return !i.Idle ? Surface.DockedMusic
+                    : i.TimerActive ? Surface.TimerPill
+                    : Surface.DockedIdle;
+
             if (!i.Idle)
                 return i.PeekShowing ? Surface.Peek
                     : i.MusicLook switch

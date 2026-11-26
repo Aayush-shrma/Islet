@@ -46,7 +46,7 @@ namespace Islet
         // The analysis only runs while something on screen uses it
         void SyncVisualizer(Surface shown)
         {
-            bool barsShown = shown is Surface.CompactMusic or Surface.SmallMusic or Surface.ExpandedMusic or Surface.Peek;
+            bool barsShown = shown is Surface.CompactMusic or Surface.SmallMusic or Surface.ExpandedMusic or Surface.Peek or Surface.DockedMusic;
             visualizer.SetActive(Settings.RealAudioVisualizer && Profile.RealAudio && playing && barsShown);
         }
 
@@ -79,6 +79,7 @@ namespace Islet
                 miniBars[i].Height = 2 + level * 11;
             expandedBars[i].Height = 3.5 + level * 22;
             peekBars[i].Height = 3 + level * 17;
+            dockedBars[i].Height = 2.5 + level * 14;
         }
 
         // ================= Memory =================

@@ -14,8 +14,11 @@ namespace Islet.Tests
             try { Directory.Delete(root, recursive: true); } catch { }
         }
 
-        ClipboardHistory New(TimeSpan? retention = null) =>
-            new(root, () => clock) { Retention = retention ?? TimeSpan.FromDays(7) };
+        // Writes only on Flush, so no timer writes into the folder after a test has deleted it
+        ClipboardHistory New(TimeSpan? retention = null, TimeSpan? saveDelay = null) =>
+            new(root, () => clock, saveDelay ?? Timeout.InfiniteTimeSpan) { Retention = retention ?? TimeSpan.FromDays(7) };
+
+        string FilePath => Path.Combine(root, "clipboard.dat");
 
         [Fact]
         public void KeepsCopiedTextNewestFirst()
@@ -123,15 +126,80 @@ namespace Islet.Tests
             var history = New();
             history.Add("https://example.com/secret-link");
             history.SetPinned(history.Items[0].Id, true);
+            history.Flush();
 
-            string file = Path.Combine(root, "clipboard.dat");
-            Assert.True(File.Exists(file));
-            Assert.DoesNotContain("secret-link", File.ReadAllText(file));
+            Assert.True(File.Exists(FilePath));
+            Assert.DoesNotContain("secret-link", File.ReadAllText(FilePath));
 
             var reopened = New();
             var entry = Assert.Single(reopened.Items);
             Assert.Equal("https://example.com/secret-link", entry.Text);
             Assert.True(entry.Pinned);
+        }
+
+        [Fact]
+        public void ChangesAreWrittenOnceTheyreFlushedNotOnEach()
+        {
+            var history = New();
+            history.Add("one");
+            history.Add("two");
+
+            // Nothing is written while the changes wait
+            Assert.False(File.Exists(FilePath));
+
+            history.Flush();
+            Assert.Equal(new[] { "two", "one" }, New().Items.Select(e => e.Text));
+        }
+
+        [Fact]
+        public void TheSaveHasTheEntriesAsTheyWereWhenChanged()
+        {
+            var history = New();
+            history.Add("note");
+
+            // Changed in place after the save was queued: the next change queues the new state
+            history.SetPinned(history.Items[0].Id, true);
+            history.Flush();
+
+            Assert.True(Assert.Single(New().Items).Pinned);
+        }
+
+        [Fact]
+        public void ClearingEverythingDeletesTheFile()
+        {
+            var history = New();
+            history.Add("gone soon");
+            history.Flush();
+            Assert.True(File.Exists(FilePath));
+
+            history.Clear(includePinned: true);
+            history.Flush();
+
+            Assert.False(File.Exists(FilePath));
+        }
+
+        [Fact]
+        public void WritesByItselfAMomentAfterTheLastChange()
+        {
+            var history = New(saveDelay: TimeSpan.FromMilliseconds(20));
+            history.Add("on its own");
+
+            var waited = System.Diagnostics.Stopwatch.StartNew();
+            while (!File.Exists(FilePath) && waited.Elapsed < TimeSpan.FromSeconds(5))
+                Thread.Sleep(10);
+
+            history.Dispose();
+            Assert.Equal("on its own", Assert.Single(New().Items).Text);
+        }
+
+        [Fact]
+        public void DisposingWritesWhatsWaiting()
+        {
+            var history = New();
+            history.Add("last copy before quitting");
+            history.Dispose();
+
+            Assert.Equal("last copy before quitting", Assert.Single(New().Items).Text);
         }
 
         [Fact]

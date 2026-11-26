@@ -253,6 +253,58 @@ public class IslandEdgeTests
     [InlineData(1050, IslandEdge.Bottom)]
     public void A_dropped_island_goes_to_the_nearer_edge(double y, IslandEdge edge) =>
         Assert.Equal(edge, MainWindow.EdgeFor(y, 1080));
+
+    [Theory]
+    [InlineData(100, IslandEdge.Top)]
+    [InlineData(900, IslandEdge.Bottom)]
+    [InlineData(1031, IslandEdge.Bottom)]
+    [InlineData(1032, IslandEdge.Taskbar)]
+    [InlineData(1070, IslandEdge.Taskbar)]
+    public void Dropped_on_the_taskbar_it_docks_in_it(double y, IslandEdge edge) =>
+        Assert.Equal(edge, MainWindow.EdgeFor(y, 1080, taskbarTop: 1032));
+
+    // A Windows 11 taskbar on a 1920 wide screen: widgets on the left, Start and the apps in the
+    // middle, the tray and clock on the right
+    static readonly (double Left, double Right)[] Buttons =
+    {
+        (0, 160),
+        (720, 760), (760, 800), (800, 1200),
+        (1600, 1700), (1700, 1920)
+    };
+
+    [Fact]
+    public void Docked_where_nothing_is_it_stays_put() =>
+        Assert.Equal(400, MainWindow.AvoidSpans(400, 236, Buttons, 1920));
+
+    [Fact]
+    public void Docked_on_the_icons_it_moves_to_the_nearest_gap()
+    {
+        // Just left of the middle: out past Start, on the left
+        Assert.Equal(720 - 6 - 118, MainWindow.AvoidSpans(800, 236, Buttons, 1920));
+
+        // Right of the middle: past the last app, on the right
+        Assert.Equal(1200 + 6 + 118, MainWindow.AvoidSpans(1150, 236, Buttons, 1920));
+    }
+
+    [Fact]
+    public void Docked_partly_over_the_icons_it_slides_just_clear()
+    {
+        // Its right side would overlap Start by a little
+        Assert.Equal(720 - 6 - 118, MainWindow.AvoidSpans(650, 236, Buttons, 1920));
+    }
+
+    [Fact]
+    public void A_gap_too_narrow_is_skipped() =>
+        // 1206..1594 fits it; a 400 wide island doesn't, so it goes to the left gap instead
+        Assert.Equal(720 - 6 - 200, MainWindow.AvoidSpans(1400, 400, Buttons, 1920));
+
+    [Fact]
+    public void Without_room_anywhere_it_stays_where_it_was_put() =>
+        Assert.Equal(900, MainWindow.AvoidSpans(900, 600, Buttons, 1920));
+
+    [Fact]
+    public void Unread_buttons_change_nothing() =>
+        Assert.Equal(960, MainWindow.AvoidSpans(960, 236, Array.Empty<(double, double)>(), 1920));
 }
 
 public class NepaliDateTests
@@ -304,5 +356,74 @@ public class DateTextTests
         {
             System.Globalization.CultureInfo.CurrentCulture = before;
         }
+    }
+}
+
+public class TaskbarButtonsTests
+{
+    [Fact]
+    public void Buttons_side_by_side_make_one_span()
+    {
+        // Start, search and the app icons touch; the tray is well apart
+        var spans = TaskbarButtons.Group(new (double, double)[]
+        {
+            (798, 853), (462, 518), (521, 796), (853, 908), (1403, 1458), (908, 1403), (1563, 1603), (1603, 1658), (1663, 1693)
+        });
+
+        Assert.Equal(new[] { (462.0, 1458.0), (1563.0, 1693.0) }, spans);
+    }
+
+    [Fact]
+    public void A_real_gap_stays_a_gap()
+    {
+        var spans = TaskbarButtons.Group(new (double, double)[] { (100, 200), (260, 300) });
+
+        Assert.Equal(2, spans.Count);
+    }
+}
+
+public class TaskbarRoomTests
+{
+    static readonly double[] Widths = { 248, 140, 40 };
+
+    // Start and the apps from 400 to 1200, the tray from 1500 to the edge
+    static readonly List<(double Left, double Right)> Buttons = new() { (400, 1200), (1500, 1920) };
+
+    [Fact]
+    public void With_room_it_gets_the_whole_button()
+    {
+        var (x, fit) = MainWindow.FitDocked(200, Widths, Buttons, 1920);
+
+        Assert.Equal(0, fit);
+        Assert.Equal(200, x);
+    }
+
+    [Fact]
+    public void In_a_narrower_gap_it_drops_to_a_smaller_button_rather_than_cover_icons()
+    {
+        // Only the 294-wide stretch between the apps and the tray... and the left one is gone
+        var crowded = new List<(double Left, double Right)> { (10, 1300), (1460, 1920) };
+
+        var (x, fit) = MainWindow.FitDocked(1380, Widths, crowded, 1920);
+
+        Assert.Equal(1, fit);
+        Assert.True(x - 70 >= 1306 && x + 70 <= 1454);
+    }
+
+    [Fact]
+    public void With_no_room_at_all_it_says_so()
+    {
+        var full = new List<(double Left, double Right)> { (10, 1910) };
+
+        var (_, fit) = MainWindow.FitDocked(900, Widths, full, 1920);
+
+        Assert.Equal(Widths.Length, fit);
+    }
+
+    [Fact]
+    public void The_free_stretch_is_between_the_neighbouring_buttons()
+    {
+        Assert.Equal(1494 - 1206, MainWindow.FreeWidthAt(1300, Buttons, 1920));
+        Assert.Equal(0, MainWindow.FreeWidthAt(800, Buttons, 1920));
     }
 }
