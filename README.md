@@ -1,10 +1,8 @@
 # Islet
 
-A **Dynamic Island** for Windows. It sits at the top or bottom of your screen showing what's playing, and opens into a Now Playing card when you hover over it.
+A **Dynamic Island** for Windows. It sits at the top or bottom of your screen, or in the taskbar, showing what's playing, and opens into a Now Playing card when you hover over it.
 
 Works with Spotify, Apple Music, and web players such as YouTube Music, Spotify Web and SoundCloud. Official music videos on YouTube show as the songs they are.
-
-*Islet used to be called MusicIsland. Copies installed under the old name switch over by themselves when they update, settings included.*
 
 <p align="center">
   <img src="docs/demo.gif" alt="Islet playing Pink Floyd's Us and Them, opening into its Now Playing card, moving on to November Rain, showing a notification, switching between its circle, small, tiny and line views, then going idle with the clock, weather and a Nepali date" width="630">
@@ -31,7 +29,7 @@ irm https://raw.githubusercontent.com/Prathambist/Islet/main/uninstall.ps1 | iex
 **Music**
 - **Now Playing:** play, pause, skip, seek, shuffle and repeat. Album art sets the colours.
 - **Synced lyrics:** from [LRCLIB](https://lrclib.net), with a timing nudge per song.
-- **Music videos as songs:** official videos, lyric videos and audio uploads on YouTube show with the song's name and album cover. Previews, feed clips and other videos stay off.
+- **Music videos as songs:** official videos, lyric videos and audio uploads on YouTube show with the song's name and album cover.
 - **Listening stats:** your top songs, artists and albums over the last five weeks, with covers, play counts, highlights and a recap picture to share. Counted on your PC.
 - **Screensaver:** away from the PC for a few minutes while music plays, the cover and the song's synced lyrics fill the screen over a slowly drifting blur of the artwork. It stays away during calls, videos and games; any key or mouse movement brings you back. Turn it on or off in Settings, or open it from the right-click menu.
 - **Live visualizer:** bars that move with the music.
@@ -78,8 +76,6 @@ cd Islet
 dotnet run --project src/Islet
 dotnet test
 ```
-
-Every push and pull request is built and tested by GitHub Actions, with a coverage report, a dependency audit and CodeQL security scanning.
 
 ## Documentation
 
